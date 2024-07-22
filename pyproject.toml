@@ -8,13 +8,38 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-clickhouse-connect = "^0.7.16"
+numpy = "<2.0.0"
+clickhouse-driver = "^0.2.8"
 
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.5.4"
 pytest = "^8.3.1"
+transformers = "^4.42.4"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+lint.select = [
+    "A",  # Pyflakes (checks for various errors)
+    "B",  # pycodestyle (PEP 8)
+    "E",  # pycodestyle (PEP 8)
+    "F",  # Pyflakes (checks for various errors)
+    "W",  # pycodestyle (PEP 8)
+    "I",  # isort (import sorting)
+    "C",  # McCabe (complexity)
+    "D",  # pydocstyle (docstring style)
+    "N",  # pep8-naming (naming conventions)
+    "PT", # flake8-pytest-style (pytest style)
+    "Q",  # flake8-quotes (quote consistency)
+    "S",  # flake8-bandit (security issues)
+    "T",  # flake8-debugger (debug statements)
+]
+lint.ignore = ["E501"]
+fix = true
+
+[tool.pylint.messages_control]
+disable = ["one-blank-line-before-class", "multi-line-summary-first-line"]
+enable = ["multi-line-summary-second-line"]
