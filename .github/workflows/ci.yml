@@ -18,7 +18,11 @@ jobs:
         ports:
           - 9000:9000
           - 8123:8123
-        options: --health-cmd='curl -f http://localhost:8123 || exit 1' --health-interval=10s --health-timeout=5s --health-retries=5
+        options: >
+          --health-cmd="curl -f http://localhost:8123 || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
     - name: Check out code
@@ -35,9 +39,12 @@ jobs:
     - name: Install dependencies
       run: poetry install --with dev
 
+    - name: Docker ps for debugging
+      run: docker ps -a
+
     - name: Wait for ClickHouse service to be healthy
       run: |
-        while ! curl -sSf http://localhost:8123 > /dev/null; do
+        until curl -sSf http://localhost:8123; do
           echo "Waiting for ClickHouse to be up..."
           sleep 5
         done

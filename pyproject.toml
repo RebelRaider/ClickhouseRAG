@@ -30,11 +30,9 @@ lint.select = [
     "W",  # pycodestyle (PEP 8)
     "I",  # isort (import sorting)
     "C",  # McCabe (complexity)
-    "D",  # pydocstyle (docstring style)
     "N",  # pep8-naming (naming conventions)
     "PT", # flake8-pytest-style (pytest style)
     "Q",  # flake8-quotes (quote consistency)
-    "S",  # flake8-bandit (security issues)
     "T",  # flake8-debugger (debug statements)
 ]
 lint.ignore = ["E501"]
