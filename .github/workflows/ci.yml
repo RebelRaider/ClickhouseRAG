@@ -34,22 +34,11 @@ jobs:
     - name: Install dependencies
       run: poetry install --with dev
 
-    - name: Wait for ClickHouse service to be healthy
-      run: |
-        until curl -sSf http://localhost:8123; do
-          echo "Waiting for ClickHouse to be up..."
-          sleep 5
-        done
-      shell: bash
-
     - name: Docker ps for debugging
       run: docker ps -a
-
-    - name: Check ClickHouse logs for debugging
-      run: docker logs $(docker ps -q --filter "ancestor=yandex/clickhouse-server")
 
     - name: Run ruff
       run: poetry run ruff check clickhouserag/ --config .ci-ruff.toml
 
     - name: Run tests
-      run: poetry run pytest
+      run: poetry run pytest --tb=short -q

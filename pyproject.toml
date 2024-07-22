@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "clickhouserag"
-version = "0.2.0"
+version = "0.3.0"
 description = "A Python library for creating RAG with Clickhouse."
 authors = ["Леонид Чесников <leonid.chesnikov@gmail.com>"]
 license = "MIT"
@@ -16,6 +16,8 @@ clickhouse-driver = "^0.2.8"
 ruff = "^0.5.4"
 pytest = "^8.3.1"
 transformers = "^4.42.4"
+torch = "^2.3.1"
+pytest-docker = "^3.1.1"
 
 [build-system]
 requires = ["poetry-core"]
@@ -43,4 +45,8 @@ disable = ["one-blank-line-before-class", "multi-line-summary-first-line"]
 enable = ["multi-line-summary-second-line"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+minversion = "6.0"
+addopts = "--strict-markers"
+testpaths = [
+    "tests"
+]
