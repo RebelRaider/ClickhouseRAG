@@ -1,7 +1,7 @@
 """Abstract client module for Clickhouse data access."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class ClickhouseClient(ABC):
@@ -13,7 +13,7 @@ class ClickhouseClient(ABC):
         pass
 
     @abstractmethod
-    def execute_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    def execute_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Tuple]:
         """Execute a query in the Clickhouse database."""
         pass
 

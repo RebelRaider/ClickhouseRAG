@@ -48,6 +48,31 @@ class TransformersVectorizer(VectorizerBase):
 
         return vector
 
+    def bulk_vectorize(self, data: Any) -> List[List[float]]:
+        """Convert listed text data into a vector representation using a Transformers model.
+
+        Args:
+        ----
+            data (Any): The listed text data to vectorize.
+
+        Returns:
+        -------
+            List[float]: The vector representation of the listed text data.
+
+        """
+        if not isinstance(data, List[str]):
+            raise ValueError("Data should be a list of a strings for text vectorization.")
+
+        inputs = self.tokenizer(
+            data, return_tensors="pt", truncation=True, padding=True
+        )
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+            # Use the mean pooling of the last hidden state as the vector
+            vector = outputs.last_hidden_state.mean(dim=1).squeeze().tolist()
+
+        return vector
+
 
 def main():
     # Создание клиента для подключения к Clickhouse

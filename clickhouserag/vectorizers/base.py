@@ -11,3 +11,8 @@ class VectorizerBase(ABC):
     def vectorize(self, data: Any) -> List[float]:
         """Convert data into a vector representation."""
         pass
+
+    @abstractmethod
+    def bulk_vectorize(self, data: Any) -> List[List[float]]:
+        """Convert multiple data into a vector representation."""
+        pass
