@@ -16,8 +16,7 @@ jobs:
         ports:
           - 9000:9000
           - 8123:8123
-        options: --health-cmd='curl -f http://localhost:8123 || exit 1' --health-interval=10s --health-timeout=5s --health-retries=5
-
+    
     steps:
     - name: Check out code
       uses: actions/checkout@v2
@@ -25,23 +24,30 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: '3.x'
+        python-version: '3.11'
 
     - name: Install Poetry
       run: pip install poetry
-
+    
     - name: Install dependencies
       run: poetry install --with dev
 
     - name: Wait for ClickHouse service to be healthy
       run: |
-        while ! curl -sSf http://localhost:8123 > /dev/null; do
+        until curl -sSf http://localhost:8123; do
           echo "Waiting for ClickHouse to be up..."
           sleep 5
         done
+      shell: bash
+
+    - name: Docker ps for debugging
+      run: docker ps -a
+
+    - name: Check ClickHouse logs for debugging
+      run: docker logs $(docker ps -q --filter "ancestor=yandex/clickhouse-server")
 
     - name: Run ruff
-      run: poetry run ruff .
+      run: poetry run ruff check clickhouserag/ --config .ci-ruff.toml
 
     - name: Run tests
       run: poetry run pytest

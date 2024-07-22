@@ -103,7 +103,7 @@ def main():
 
     # Выполнение поиска по косинусной схожести
     embedding = np.random.rand(768)  # Пример случайного вектора
-    similarity_results = rag_manager.similarity_search(embedding, top_k=2)
+    similarity_results = rag_manager.similarity_search(embedding, top_k=2, columns=["id", "title"])
     print("Similarity search results:", similarity_results)
 
     # Удаление данных

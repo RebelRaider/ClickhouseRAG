@@ -104,11 +104,12 @@ class RAGManager(RAGBase):
             self.logger.info(f"Search executed with query '{query}', found {len(results)} results")
             return results
 
-    def similarity_search(self, embedding: np.array, top_k: Optional[int]) -> List[Dict[str, Any]]:
+    def similarity_search(self, embedding: np.array, columns: List[str], top_k: Optional[int]) -> List[Dict[str, Any]]:
         """Search the RAG based on cosine similarity."""
+        columns_str = ", ".join(columns)
         query = f"""
         WITH %(embedding)s as query_vector
-        SELECT id, title,
+        SELECT {columns_str}
         arraySum(x -> x * x, vector) * arraySum(x -> x * x, query_vector) != 0
         ? arraySum((x, y) -> x * y, vector, query_vector) / sqrt(arraySum(x -> x * x, vector) * arraySum(x -> x * x, query_vector))
         : 0 AS cosine_distance

@@ -35,9 +35,12 @@ lint.select = [
     "Q",  # flake8-quotes (quote consistency)
     "T",  # flake8-debugger (debug statements)
 ]
-lint.ignore = ["E501"]
+lint.ignore = ["E501", "T201"]
 fix = true
 
 [tool.pylint.messages_control]
 disable = ["one-blank-line-before-class", "multi-line-summary-first-line"]
 enable = ["multi-line-summary-second-line"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
