@@ -4,8 +4,8 @@ import numpy as np
 import torch
 from transformers import AutoModel, AutoTokenizer
 
-from clickhouserag.data_access.clickhouse_client import ClickhouseConnectClient
-from clickhouserag.rag.manager import RAGManager
+from clickhouserag.clickhouse.clients import ClickhouseConnectClient
+from clickhouserag.rag.managers import RAGManager
 from clickhouserag.vectorizers.base import VectorizerBase
 
 
@@ -136,10 +136,11 @@ def main():
 
     # Резервное копирование базы данных
     rag_manager.backup_database("backup.json")
+    rag_manager.backup_database("backup.csv")
 
     # Сброс и восстановление базы данных
     rag_manager.reset_database()
-    rag_manager.restore_database("backup.json", table_schema=table_schema)
+    rag_manager.restore_database("backup.json", table_schema=table_schema, engine="MergeTree", order_by="id")
 
     # Закрытие подключения к базе данных
     client.close()

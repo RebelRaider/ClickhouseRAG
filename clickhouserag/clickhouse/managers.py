@@ -3,8 +3,8 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from clickhouserag.data_access.abstract_table import ClickhouseTable
-from clickhouserag.data_access.clickhouse_client import ClickhouseConnectClient
+from clickhouserag.clickhouse.base import ClickhouseTable
+from clickhouserag.clickhouse.clients import ClickhouseConnectClient
 
 
 class ClickhouseTableManager(ClickhouseTable):

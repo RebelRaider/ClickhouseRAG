@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from clickhouse_driver import Client, errors
 
-from clickhouserag.data_access.abstract_client import ClickhouseClient
+from clickhouserag.clickhouse.base import ClickhouseClient
 
 
 def ensure_connection(method):

@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from clickhouserag.data_access.clickhouse_client import ClickhouseConnectClient
-from clickhouserag.data_access.clickhouse_table import ClickhouseTableManager
-from clickhouserag.rag.manager import RAGManager
+from clickhouserag.clickhouse.clients import ClickhouseConnectClient
+from clickhouserag.clickhouse.managers import ClickhouseTableManager
+from clickhouserag.rag.managers import RAGManager
 
 
 @pytest.fixture(scope="session")
@@ -17,7 +17,7 @@ def docker_compose_file(pytestconfig):
 def _clickhouse_service(docker_services):
     """Ensure that Clickhouse service is up and responsive."""
     docker_services.start("clickhouse")
-    time.sleep(10)  # Give some time for Clickhouse to be ready
+    time.sleep(10)
 
     yield
 
