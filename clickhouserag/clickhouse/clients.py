@@ -1,21 +1,12 @@
 """Clickhouse client module for Clickhouse data access."""
 
-import functools
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from clickhouse_driver import Client, errors
 
 from clickhouserag.clickhouse.base import ClickhouseClient
-
-
-def ensure_connection(method):
-    @functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        if not self.client:
-            raise ConnectionError("Client is not connected. Call `connect` first.")
-        return method(self, *args, **kwargs)
-    return wrapper
+from clickhouserag.utils.connection import ensure_connection
 
 
 class ClickhouseConnectClient(ClickhouseClient):
@@ -31,7 +22,6 @@ class ClickhouseConnectClient(ClickhouseClient):
             username (str): The username for Clickhouse authentication.
             password (str): The password for Clickhouse authentication.
             database (str): The database to connect to.
-
         """
         self.host = host
         self.port = port
@@ -46,6 +36,7 @@ class ClickhouseConnectClient(ClickhouseClient):
         try:
             self.client = Client(host=self.host, port=self.port, user=self.username, password=self.password, database=self.database)
             self.ping()
+            self.logger.info("Connected to Clickhouse database.")
         except errors.Error as err:
             self.logger.error(f"Failed to connect to Clickhouse: {err}")
             raise ConnectionError(f"Failed to connect to Clickhouse: {err}") from err
@@ -76,7 +67,7 @@ class ClickhouseConnectClient(ClickhouseClient):
     def fetch_one(self, query: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """Fetch one result from the Clickhouse database."""
         result = self._execute(query, params)
-        return result[0] if result else None
+        return dict(result[0]) if result else None
 
     def fetch_all(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Fetch all results from the Clickhouse database."""
@@ -96,6 +87,7 @@ class ClickhouseConnectClient(ClickhouseClient):
         try:
             if self.client:
                 self.client.disconnect()
+                self.logger.info("Disconnected from Clickhouse database.")
         except errors.Error as err:
             self.logger.error(f"Failed to close connection: {err}")
             raise RuntimeError(f"Failed to close connection: {err}") from err

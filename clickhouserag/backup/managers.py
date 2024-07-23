@@ -1,6 +1,4 @@
-import json
 import logging
-import os
 from typing import Dict, Optional
 
 import pandas as pd
@@ -8,6 +6,12 @@ import pandas as pd
 from clickhouserag.backup import BackupFormat
 from clickhouserag.clickhouse.base import ClickhouseClient
 from clickhouserag.clickhouse.managers import ClickhouseTableManager
+from clickhouserag.utils import (
+    check_installed,
+    get_format_from_path,
+    load_json,
+    save_json,
+)
 
 
 class BackupManager:
@@ -23,7 +27,6 @@ class BackupManager:
         """
         self.client = client
         self.table_manager = table_manager
-        self.logger = logging.getLogger(__name__)
         self.logger = logging.getLogger(__name__)
 
         self._backup_handlers = {
@@ -54,8 +57,8 @@ class BackupManager:
             ValueError: If an unsupported format is specified.
             RuntimeError: If the backup operation fails.
         """
-        backup_format = self._get_format_from_path(path)
-        handler = self._backup_handlers.get(backup_format)
+        backup_format = get_format_from_path(path)
+        handler = self._backup_handlers.get(BackupFormat(backup_format))
         if handler:
             handler(path)
         else:
@@ -76,8 +79,8 @@ class BackupManager:
             ValueError: If an unsupported format is specified.
             RuntimeError: If the restore operation fails.
         """
-        backup_format = self._get_format_from_path(path)
-        handler = self._restore_handlers.get(backup_format)
+        backup_format = get_format_from_path(path)
+        handler = self._restore_handlers.get(BackupFormat(backup_format))
         if handler:
             handler(path, table_schema, engine, order_by)
         else:
@@ -85,19 +88,18 @@ class BackupManager:
 
     def _backup_to_json(self, path: str) -> None:
         data = self.table_manager.fetch_all()
-        with open(path, "w") as file:
-            json.dump(data, file)
+        save_json(data, path)
         self.logger.info(f"Database backup created at {path} in JSON format")
 
     def _backup_to_parquet(self, path: str) -> None:
-        self._check_installed("pyarrow", "fastparquet")
+        check_installed("pyarrow", "fastparquet")
         data = self.table_manager.fetch_all()
         df = pd.DataFrame(data)
         df.to_parquet(path, engine="pyarrow")
         self.logger.info(f"Database backup created at {path} in Parquet format")
 
     def _backup_to_protobyte(self, path: str) -> None:
-        self._check_installed("protobuf")
+        check_installed("protobuf")
         # TODO Implement protobuf serialization
         raise ValueError("Protobuf serialization is not implemented yet")
 
@@ -115,17 +117,16 @@ class BackupManager:
 
     def _restore_from_json(self, path: str, table_schema: Optional[Dict[str, str]], engine: str, order_by: str) -> None:
         if table_schema:
-            self.rag_manager._initialize_table(table_schema, engine, order_by)
-        with open(path, "r") as file:
-            data = json.load(file)
+            self._initialize_table(table_schema, engine, order_by)
+        data = load_json(path)
         self.table_manager.reset_table()
         self.table_manager.insert(data)
         self.logger.info(f"Database restored from {path} in JSON format")
 
     def _restore_from_parquet(self, path: str, table_schema: Optional[Dict[str, str]], engine: str, order_by: str) -> None:
-        self._check_installed("pyarrow", "fastparquet")
+        check_installed("pyarrow", "fastparquet")
         if table_schema:
-            self.rag_manager._initialize_table(table_schema, engine, order_by)
+            self._initialize_table(table_schema, engine, order_by)
         df = pd.read_parquet(path, engine="pyarrow")
         data = df.to_dict(orient="records")
         self.table_manager.reset_table()
@@ -133,13 +134,13 @@ class BackupManager:
         self.logger.info(f"Database restored from {path} in Parquet format")
 
     def _restore_from_protobyte(self, path: str, table_schema: Optional[Dict[str, str]], engine: str, order_by: str) -> None:
-        self._check_installed("protobuf")
+        check_installed("protobuf")
         # TODO Implement protobuf deserialization
         raise ValueError("Protobuf deserialization is not implemented yet")
 
     def _restore_from_csv(self, path: str, table_schema: Optional[Dict[str, str]], engine: str, order_by: str) -> None:
         if table_schema:
-            self.rag_manager._initialize_table(table_schema, engine, order_by)
+            self._initialize_table(table_schema, engine, order_by)
         df = pd.read_csv(path)
         data = df.to_dict(orient="records")
         self.table_manager.reset_table()
@@ -148,50 +149,12 @@ class BackupManager:
 
     def _restore_from_excel(self, path: str, table_schema: Optional[Dict[str, str]], engine: str, order_by: str) -> None:
         if table_schema:
-            self.rag_manager._initialize_table(table_schema, engine, order_by)
+            self._initialize_table(table_schema, engine, order_by)
         df = pd.read_excel(path)
         data = df.to_dict(orient="records")
         self.table_manager.reset_table()
         self.table_manager.insert(data)
         self.logger.info(f"Database restored from {path} in Excel format")
-
-    def _check_installed(self, *libraries: str) -> None:
-        """Check if the required libraries are installed.
-
-        Args:
-        ----
-            libraries (str): Libraries to check.
-
-        Raises:
-        ------
-            ImportError: If a required library is not installed.
-        """
-        for lib in libraries:
-            try:
-                __import__(lib)
-            except ImportError as e:
-                raise ImportError(f"Library '{lib}' is not installed. Please install it to use this feature.") from e
-
-    def _get_format_from_path(self, path: str) -> BackupFormat:
-        """Get the backup format from the file path.
-
-        Args:
-        ----
-            path (str): The file path.
-
-        Returns:
-        -------
-            BackupFormat: The backup format inferred from the file extension.
-
-        Raises:
-        ------
-            ValueError: If the file extension does not match a supported format.
-        """
-        ext = os.path.splitext(path)[1].lower()
-        try:
-            return BackupFormat(ext.lstrip("."))
-        except ValueError as e:
-            raise ValueError(f"Unsupported file extension: {ext}") from e
 
     def _initialize_table(self, table_schema: Dict[str, str], engine: str, order_by: str) -> None:
         """Initialize the table in Clickhouse based on the provided schema if it does not exist."""
