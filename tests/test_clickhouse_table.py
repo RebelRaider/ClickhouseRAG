@@ -34,4 +34,4 @@ def test_fetch_all(table_manager):
 def test_reset_table(table_manager):
     table_manager.reset_table()
     query = "TRUNCATE TABLE test_table"
-    table_manager.client.execute_query.assert_called_once_with(query)
+    table_manager.client.execute_query.assert_called_once_with(query, None)
