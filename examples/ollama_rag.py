@@ -35,7 +35,8 @@ def main() -> None:
         rag.index(Document("ledger", "Ledger writes Vault.", "https://example.org/ledger"))
 
         question = "Which database does Gateway write to through Ledger?"
-        for answer in (rag.ask(question), rag.ask_knowledge(question)):
+        for ask in (rag.ask, rag.ask_knowledge):
+            answer = ask(question)
             print(answer.text, [item.source for item in answer.citations])
 
 

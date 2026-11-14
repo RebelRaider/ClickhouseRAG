@@ -40,8 +40,11 @@ def test_provider_implements_structured_requests_and_citations() -> None:
         assert answer.citation_ids == ["first"]
         methods = [(call.args[0], call.args[1]) for call in connection.request.call_args_list]
         assert methods == [("POST", "/api/embed"), *(("POST", "/api/chat"),) * 3]
+        planner_request = json.loads(connection.request.call_args_list[2].args[2])
+        assert planner_request["format"]["properties"]["predicates"]["items"]["enum"] == ["calls"]
         request = json.loads(connection.request.call_args.args[2])
         assert request["format"]["required"] == ["answer", "citations"]
+        assert request["format"]["properties"]["citations"]["items"]["enum"] == ["1"]
         assert json.loads(request["messages"][1]["content"])["evidence"] == [
             {"id": "1", "text": passage.text}
         ]
