@@ -107,6 +107,11 @@ representative distribution of lookups, paraphrases, multi-hop and unanswerable
 questions. Measure project-appropriate p95 latency and report any truncated
 paths, retries or provider failures.
 
+## Model providers
+
+See the [model provider guide](providers.md) for mixing local and hosted
+embedding, extraction, planning and generation APIs.
+
 ## Local models with Ollama
 
 Use the supplied adapter to try arbitrary text with a local model server.

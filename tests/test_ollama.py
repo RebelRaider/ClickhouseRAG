@@ -17,7 +17,7 @@ def test_provider_implements_structured_requests_and_citations() -> None:
         embedding_model="embed", chat_model="chat", dimensions=2, schema=schema, max_relations=3
     )
     passage = Chunk("first", "doc", "Gateway calls Ledger.", "source")
-    with patch("clickhouserag.ollama.http.client.HTTPConnection") as factory:
+    with patch("clickhouserag.providers._http.http.client.HTTPConnection") as factory:
         connection = factory.return_value
         response = connection.getresponse.return_value
         response.status = 200
@@ -89,7 +89,7 @@ def test_planner_intersects_paths_and_requires_entities_in_the_question() -> Non
 def test_provider_rejects_unexpected_citations_and_http_failures() -> None:
     adapter = Ollama(embedding_model="embed", chat_model="chat", dimensions=2)
     context = Context((Chunk("first", "doc", "Evidence", "source"),))
-    with patch("clickhouserag.ollama.http.client.HTTPConnection") as factory:
+    with patch("clickhouserag.providers._http.http.client.HTTPConnection") as factory:
         response = factory.return_value.getresponse.return_value
         response.status = 200
         response.read.return_value = _chat({"answer": "unknown", "citations": ["88"]})
@@ -103,8 +103,8 @@ def test_provider_rejects_unexpected_citations_and_http_failures() -> None:
 def test_provider_rejects_embedding_count_mismatch() -> None:
     adapter = Ollama(embedding_model="embed", chat_model="chat", dimensions=2)
     with (
-        patch.object(adapter, "_request", return_value={"embeddings": []}),
-        pytest.raises(ModelResponseError, match="number of embeddings"),
+        patch.object(adapter._embedder._endpoint, "post", return_value={"embeddings": []}),
+        pytest.raises(ModelResponseError, match="number of embedding vectors"),
     ):
         adapter.embed_query("question")
 
