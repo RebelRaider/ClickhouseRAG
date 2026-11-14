@@ -4,7 +4,7 @@ import os
 
 import clickhouse_connect
 
-from clickhouserag import RAG, Document, Predicate
+from clickhouserag import Document, Predicate
 from clickhouserag.ollama import Ollama
 
 
@@ -29,16 +29,7 @@ def main() -> None:
         autogenerate_session_id=False,
         form_encode_query_params=True,
     ) as client:
-        rag = RAG(
-            client,
-            model,
-            dimensions=model.dimensions,
-            table="ollama_rag_demo",
-            extractor=model,
-            generator=model,
-            planner=model,
-            schema=schema,
-        )
+        rag = model.rag(client, table="ollama_rag_demo")
         rag.initialize()
         rag.index(Document("gateway", "Gateway calls Ledger.", "https://example.org/gateway"))
         rag.index(Document("ledger", "Ledger writes Vault.", "https://example.org/ledger"))

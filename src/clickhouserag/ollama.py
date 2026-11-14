@@ -7,10 +7,12 @@ from dataclasses import asdict
 from typing import Any
 from urllib.parse import urlsplit
 
+from clickhouse_connect.driver.client import Client
+
 from clickhouserag._validation import _MAX_DIMENSIONS, integer, nonblank
 from clickhouserag.knowledge import KnowledgeQuery, Predicate
 from clickhouserag.models import Chunk
-from clickhouserag.rag import Context, ExtractedRelation, GeneratedAnswer
+from clickhouserag.rag import RAG, Context, ExtractedRelation, GeneratedAnswer
 
 _MAX_RESPONSE = 16 * 1024 * 1024
 _MAX_EMBED_BATCH = 64
@@ -85,6 +87,33 @@ class Ollama:
         self.dimensions = dimensions
         self.model_id = (
             f"ollama:{embedding_model}:{embedding_version or 'unversioned'}:{dimensions}"
+        )
+
+    def rag(
+        self,
+        client: Client,
+        *,
+        table: str = "rag_passages",
+        database: str = "default",
+        namespace: str = "default",
+        chunk_size: int = 1600,
+        chunk_overlap: int = 160,
+    ) -> RAG:
+        """Configure one collection with this adapter for all enabled RAG stages."""
+        schema = tuple(self._schema.values()) or None
+        return RAG(
+            client,
+            self,
+            dimensions=self.dimensions,
+            table=table,
+            database=database,
+            namespace=namespace,
+            extractor=self,
+            generator=self,
+            schema=schema,
+            planner=self if schema is not None else None,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
         )
 
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:

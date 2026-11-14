@@ -79,7 +79,7 @@ Set the dimension to a size supported by the embedding model.
 ```python
 import clickhouse_connect
 
-from clickhouserag import RAG, Document, Predicate
+from clickhouserag import Document, Predicate
 from clickhouserag.ollama import Ollama
 
 schema = (
@@ -94,16 +94,7 @@ with clickhouse_connect.get_client(
     autogenerate_session_id=False,
     form_encode_query_params=True,
 ) as client:
-    rag = RAG(
-        client,
-        model,
-        dimensions=model.dimensions,
-        table="service_runbooks",
-        extractor=model,
-        generator=model,
-        schema=schema,
-        planner=model,
-    )
+    rag = model.rag(client, table="service_runbooks")
     rag.initialize()
     rag.index(Document("gateway", "Gateway calls Ledger.", "https://example.org/gateway"))
     rag.index(Document("ledger", "Ledger writes Vault.", "https://example.org/ledger"))
