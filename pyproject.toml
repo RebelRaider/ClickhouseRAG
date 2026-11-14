@@ -1,54 +1,68 @@
-[tool.poetry]
-name = "clickhouserag"
-version = "0.3.0"
-description = "A Python library for creating RAG with Clickhouse."
-authors = ["Леонид Чесников <leonid.chesnikov@gmail.com>"]
-license = "MIT"
-readme = "README.md"
-
-[tool.poetry.dependencies]
-python = "^3.11"
-numpy = "<2.0.0"
-clickhouse-driver = "^0.2.8"
-pandas = "^2.2.2"
-
-
-[tool.poetry.group.dev.dependencies]
-ruff = "^0.5.4"
-pytest = "^8.3.1"
-transformers = "^4.42.4"
-torch = "^2.3.1"
-pytest-docker = "^3.1.1"
-pandas = "^2.2.2"
-
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "clickhouserag"
+version = "1.0.0a1"
+description = "Filter-scoped retrieval for RAG applications backed by ClickHouse"
+readme = "README.md"
+requires-python = ">=3.11,<3.16"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["clickhouse", "rag", "hybrid-search", "vector-search", "retrieval"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: Database",
+    "Typing :: Typed",
+]
+dependencies = ["clickhouse-connect>=1.12,<2"]
+
+[project.urls]
+Repository = "https://github.com/RebelRaider/ClickhouseRAG"
+Issues = "https://github.com/RebelRaider/ClickhouseRAG/issues"
+
+[dependency-groups]
+dev = [
+    "bandit>=1.8",
+    "coverage[toml]>=7.13",
+    "hypothesis>=6.140",
+    "pip-audit>=2.9",
+    "pytest>=9",
+    "ruff>=0.15",
+    "twine>=6.2",
+    "ty>=0.0.28",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/clickhouserag"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/tests", "/examples", "/README.md", "/LICENSE"]
 
 [tool.ruff]
-lint.select = [
-    "A",  # Pyflakes (checks for various errors)
-    "B",  # pycodestyle (PEP 8)
-    "E",  # pycodestyle (PEP 8)
-    "F",  # Pyflakes (checks for various errors)
-    "W",  # pycodestyle (PEP 8)
-    "I",  # isort (import sorting)
-    "C",  # McCabe (complexity)
-    "N",  # pep8-naming (naming conventions)
-    "PT", # flake8-pytest-style (pytest style)
-    "Q",  # flake8-quotes (quote consistency)
-    "T",  # flake8-debugger (debug statements)
-]
-lint.ignore = ["E501", "T201"]
-fix = true
+target-version = "py311"
+line-length = 100
 
-[tool.pylint.messages_control]
-disable = ["one-blank-line-before-class", "multi-line-summary-first-line"]
-enable = ["multi-line-summary-second-line"]
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 
 [tool.pytest.ini_options]
-minversion = "6.0"
-addopts = "--strict-markers"
-testpaths = [
-    "tests"
-]
+addopts = "--strict-config --strict-markers"
+testpaths = ["tests"]
+markers = ["integration: requires a real ClickHouse server"]
+xfail_strict = true
+
+[tool.coverage.run]
+branch = true
+source = ["clickhouserag"]
+
+[tool.coverage.report]
+show_missing = true
