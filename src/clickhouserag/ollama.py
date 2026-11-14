@@ -157,7 +157,11 @@ class Ollama:
                 "passage": chunk.text,
                 "predicates": [asdict(item) for item in self._schema.values()],
             },
-            _object(relations=_array(_object(subject=_STR, predicate=predicate, object=_STR), 64)),
+            _object(
+                relations=_array(
+                    _object(subject=_STR, predicate=predicate, object=_STR), _MAX_RELATIONS
+                )
+            ),
         )
         rows = output.get("relations")
         if not isinstance(rows, list) or len(rows) > _MAX_RELATIONS:

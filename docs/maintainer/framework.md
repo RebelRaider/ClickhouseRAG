@@ -56,3 +56,14 @@ concurrency and retry tests. Compare graph query plans on graphs with
 high-degree nodes. Evaluate corpus-wide questions with separately generated
 community evidence and include a representative labelled corpus before
 promoting the framework release.
+
+
+### Verification baseline
+
+The bundled four-document synthetic example uses a controlled embedding,
+extractor and generator. On the multi-hop question, dense, lexical and
+hybrid retrieval returned no relevant evidence in their first two results.
+Graph, mixed and explicitly planned KAG returned both supporting passages.
+The example reports metrics by category and makes the synthetic setup
+reproducible. Compare a representative corpus before using these results
+to choose a mode for production.
