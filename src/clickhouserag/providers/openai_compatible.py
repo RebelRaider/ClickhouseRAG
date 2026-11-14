@@ -7,7 +7,7 @@ from clickhouserag._structured import ModelResponseError
 from clickhouserag._validation import integer, nonblank
 from clickhouserag.providers._chat import model_text, single_record, text_blocks
 from clickhouserag.providers._embeddings import TextEmbeddings, indexed_vectors
-from clickhouserag.providers._http import JsonEndpoint
+from clickhouserag.providers._http import Credential, JsonEndpoint
 
 
 class OpenAICompatibleEmbeddings(TextEmbeddings):
@@ -19,7 +19,8 @@ class OpenAICompatibleEmbeddings(TextEmbeddings):
         dimensions: int,
         *,
         base_url: str,
-        api_key: str | None = None,
+        api_key: Credential | None = None,
+        auth: Literal["bearer", "api-key"] = "bearer",
         revision: str | None = None,
         request_dimensions: bool = False,
         query_prefix: str = "",
@@ -27,7 +28,7 @@ class OpenAICompatibleEmbeddings(TextEmbeddings):
         batch_size: int = 64,
         timeout: int = 120,
     ) -> None:
-        self._endpoint = JsonEndpoint(base_url, timeout=timeout, key=api_key)
+        self._endpoint = _endpoint(base_url, api_key, auth, timeout)
         super().__init__(
             "openai-compatible",
             model,
@@ -62,7 +63,8 @@ class OpenAICompatibleChat:
         model: str,
         *,
         base_url: str,
-        api_key: str | None = None,
+        api_key: Credential | None = None,
+        auth: Literal["bearer", "api-key"] = "bearer",
         json_mode: Literal["schema", "object"] = "schema",
         max_tokens: int = 4096,
         token_parameter: Literal["max_completion_tokens", "max_tokens"] = "max_completion_tokens",
@@ -74,7 +76,7 @@ class OpenAICompatibleChat:
             raise ValueError("json_mode must be schema or object")
         if token_parameter not in ("max_completion_tokens", "max_tokens"):
             raise ValueError("unsupported completion token parameter")
-        self._endpoint = JsonEndpoint(base_url, timeout=timeout, key=api_key)
+        self._endpoint = _endpoint(base_url, api_key, auth, timeout)
         self._model = model
         self._json_mode = json_mode
         self._token_parameter = token_parameter
@@ -122,13 +124,14 @@ class OpenAICompatibleResponses:
         model: str,
         *,
         base_url: str,
-        api_key: str | None = None,
+        api_key: Credential | None = None,
+        auth: Literal["bearer", "api-key"] = "bearer",
         max_tokens: int = 4096,
         timeout: int = 120,
     ) -> None:
         nonblank(model, "model")
         integer(max_tokens, "max_tokens", 2**31 - 1)
-        self._endpoint = JsonEndpoint(base_url, timeout=timeout, key=api_key)
+        self._endpoint = _endpoint(base_url, api_key, auth, timeout)
         self._model = model
         self._max_tokens = max_tokens
 
@@ -169,3 +172,13 @@ class OpenAICompatibleResponses:
         ):
             raise ModelResponseError("Model did not return a completed assistant message")
         return text_blocks(blocks, block_type="output_text")
+
+
+def _endpoint(
+    base_url: str, key: Credential | None, auth: Literal["bearer", "api-key"], timeout: int
+) -> JsonEndpoint:
+    if auth == "api-key":
+        return JsonEndpoint(base_url, timeout=timeout, key=key, key_header="api-key", key_prefix="")
+    if auth != "bearer":
+        raise ValueError("auth must be bearer or api-key")
+    return JsonEndpoint(base_url, timeout=timeout, key=key)

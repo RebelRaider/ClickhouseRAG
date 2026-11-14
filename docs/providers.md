@@ -61,6 +61,9 @@ and Qwen 2.5 1.5B as in the [framework quickstart](framework.md). Run
 `uv run --locked python examples/composed_models.py`. It uses native
 Ollama embeddings and independently configured Responses generation over
 the same ClickHouse collection. It creates and drops a temporary demo table.
+Set `RAG_EMBEDDING_URL` to an OpenAI-compatible base URL to replace the
+embedding server independently. The example was verified with llama.cpp
+serving EmbeddingGemma and Ollama serving Qwen via Responses.
 
 ## Configure the model and endpoint
 
@@ -73,11 +76,18 @@ the same ClickHouse collection. It creates and drops a temporary demo table.
   and `token_parameter="max_tokens"` on servers using the older field.
   `OpenAICompatibleResponses` requires a Responses endpoint that supports
   structured output. Requests include `store=False`.
+- For [Azure OpenAI v1](https://learn.microsoft.com/en-us/azure/foundry/openai/api-version-lifecycle),
+  use the resource URL ending in `/openai/v1` and the deployment name as
+  `model`. Set `auth="api-key"` for the Azure key header, or use the default
+  `bearer` mode and pass a callable returning the current Entra token as
+  `api_key`. The callable runs per request. This also allows token renewal
+  for compatible gateways that accept bearer credentials.
 - All adapters validate returned dimensions. Enable `request_dimensions=True`
   only for embedding models that let the caller choose the output dimension.
   Use `query_prefix` and `document_prefix` for embedding models that require
   different instructions for search and indexing. Gemini's `use_task_type`
   is intended for models with the corresponding retrieval task support.
+  For a default TEI server set `batch_size=32` to match its client limit.
 - Model identity for the new embedders includes the endpoint, model,
   dimensions and encoding settings. Set `revision` to pin a version or
   deployment revision. Use a new table when changing the embedding space.

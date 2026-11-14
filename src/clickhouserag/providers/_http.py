@@ -3,6 +3,7 @@
 import http.client
 import ipaddress
 import json
+from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -10,6 +11,7 @@ from clickhouserag._structured import ModelResponseError, _json_object
 from clickhouserag._validation import integer
 
 _MAX_RESPONSE = 16 * 1024 * 1024
+Credential = str | Callable[[], str]
 
 
 class ModelHTTPError(ModelResponseError):
@@ -27,7 +29,7 @@ class JsonEndpoint:
         base_url: str,
         *,
         timeout: int,
-        key: str | None = None,
+        key: Credential | None = None,
         key_header: str = "Authorization",
         key_prefix: str = "Bearer ",
         headers: dict[str, str] | None = None,
@@ -47,12 +49,10 @@ class JsonEndpoint:
                 "base_url must be an HTTP(S) URL without credentials, query or fragment"
             )
         if key is not None:
-            if not key or any(not 33 <= ord(char) <= 126 for char in key):
-                raise ValueError(
-                    "api_key must be nonempty and contain no spaces or control characters"
-                )
             if parsed.scheme != "https" and not _loopback(parsed.hostname):
                 raise ValueError("Use HTTPS for authenticated model endpoints outside loopback")
+            if not callable(key):
+                _validate_key(key)
         self.url = base_url.rstrip("/")
         self._secure = parsed.scheme == "https"
         self._host = parsed.hostname
@@ -60,8 +60,9 @@ class JsonEndpoint:
         self._path = parsed.path.rstrip("/")
         self._timeout = timeout
         self._headers = {"Content-Type": "application/json", **(headers or {})}
-        if key is not None:
-            self._headers[key_header] = f"{key_prefix}{key}"
+        self._key = key
+        self._key_header = key_header
+        self._key_prefix = key_prefix
 
     def post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         return _json_object(self._send(path, body))
@@ -76,12 +77,17 @@ class JsonEndpoint:
         return result
 
     def _send(self, path: str, body: dict[str, Any]) -> bytes:
+        headers = self._headers.copy()
+        if self._key is not None:
+            key = self._key() if callable(self._key) else self._key
+            _validate_key(key)
+            headers[self._key_header] = f"{self._key_prefix}{key}"
         connection_type = (
             http.client.HTTPSConnection if self._secure else http.client.HTTPConnection
         )
         connection = connection_type(self._host, self._port, timeout=self._timeout)
         try:
-            connection.request("POST", self._path + path, json.dumps(body), self._headers)
+            connection.request("POST", self._path + path, json.dumps(body), headers)
             response = connection.getresponse()
             if not 200 <= response.status < 300:
                 raise ModelHTTPError(response.status, response.getheader("Retry-After"))
@@ -102,3 +108,8 @@ def _loopback(host: str) -> bool:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
         return False
+
+
+def _validate_key(key: object) -> None:
+    if not isinstance(key, str) or not key or any(not 33 <= ord(char) <= 126 for char in key):
+        raise ValueError("api_key must be nonempty and contain no spaces or control characters")

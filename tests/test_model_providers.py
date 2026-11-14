@@ -241,3 +241,29 @@ def test_refusal_or_truncation_never_becomes_cited_answer() -> None:
         for _ in range(2):
             with pytest.raises(ModelResponseError, match="complete"):
                 StructuredLLM(chat).generate("question", _CONTEXT)
+
+
+def test_azure_v1_key_header_and_bearer_token_refresh() -> None:
+    url = "https://resource.openai.azure.com/openai/v1/"
+    refreshed = iter(["first-token", "second-token"])
+    key_client = OpenAICompatibleEmbeddings(
+        "deployment", 2, base_url=url, api_key="fixture", auth="api-key"
+    )
+    token_client = OpenAICompatibleEmbeddings(
+        "deployment", 2, base_url=url, api_key=lambda: next(refreshed)
+    )
+    assert key_client.model_id == token_client.model_id
+    with patch("clickhouserag.providers._http.http.client.HTTPSConnection") as factory:
+        connection = factory.return_value
+        response = connection.getresponse.return_value
+        response.status = 200
+        response.read.return_value = json.dumps(_indexed([1, 2])).encode()
+        for client in (key_client, token_client, token_client):
+            assert client.embed_query("query") == [1, 2]
+        assert all(
+            call.args[1] == "/openai/v1/embeddings" for call in connection.request.call_args_list
+        )
+        fixed, first, second = (call.args[3] for call in connection.request.call_args_list)
+        assert fixed["api-key"] == "fixture" and "Authorization" not in fixed
+        assert first["Authorization"] == "Bearer first-token"
+        assert second["Authorization"] == "Bearer second-token"
