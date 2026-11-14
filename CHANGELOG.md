@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v1.1.0 (2026-11-14)
+
+- Add the document-oriented `RAG` API with atomic revision visibility and
+  logical deletion in a managed ClickHouse table.
+- Add cited relationship traversal and corpus overviews alongside hybrid text
+  and vector search. Hybrid is the default.
+- Add typed knowledge chains and intersections with complete path citations,
+  an Ollama adapter, and retrieval, answer and citation evaluation.
+- Keep the existing `ClickHouseStore` and `Retriever` APIs and tables usable.
+  See the [framework walkthrough](https://rebelraider.github.io/ClickhouseRAG/framework/)
+  and [measured benchmarks](https://rebelraider.github.io/ClickhouseRAG/benchmark/).
+
+### Testing
+
+- **graph**: Measure traversal cost under a shared hub
+  ([`1d8d8e5`](https://github.com/RebelRaider/ClickhouseRAG/commit/1d8d8e53a2bf7536e81ab0bcada16acdb9ebb138))
+
+
 ## v1.1.0-rc.1 (2026-11-14)
 
 Hybrid is the default for document retrieval and answers. Choose

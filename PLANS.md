@@ -42,8 +42,8 @@ may be published. The GitHub and PyPI states must be checked independently.
   See the [release run](https://github.com/RebelRaider/ClickhouseRAG/actions/runs/43591253502),
   [release files](https://github.com/RebelRaider/ClickhouseRAG/releases/tag/v1.0.0)
   and [hosted documentation](https://rebelraider.github.io/ClickhouseRAG/).
-- PyPI publishing uses the existing project and requires its owner to
-  configure Trusted Publishing. The tag is already available on GitHub.
+- Version 1.0.1 was published to [PyPI](https://pypi.org/project/clickhouserag/1.0.1/)
+  using Trusted Publishing and to [GitHub Releases](https://github.com/RebelRaider/ClickhouseRAG/releases/tag/v1.0.1).
 
 ## ClickHouse RAG framework
 
@@ -64,3 +64,10 @@ alongside existing tables. No separate graph or vector service is required.
 
 Sources and rationale are in the
 [framework design](docs/maintainer/framework.md).
+
+The framework was integrated in [PR #7](https://github.com/RebelRaider/ClickhouseRAG/pull/7)
+and its wheel and sdist verified from the
+[1.1.0 release candidate](https://github.com/RebelRaider/ClickhouseRAG/releases/tag/v1.1.0-rc.1).
+The [benchmark](docs/benchmark.md) records the 12-case public comparison and
+the synthetic shared-hub cost probe. Continue evaluating model planning,
+graph candidate ranking and community quality on representative workloads.
