@@ -339,7 +339,17 @@ class RAG:
         except KnowledgePlanError:
             return Answer(None, (), Context(()))
         context = _knowledge_context(result, limit)
-        return self._answer(question, context)
+        answer = self._answer(question, context)
+        if answer.text is None:
+            return answer
+        cited = {chunk.chunk_id for chunk in answer.citations}
+        covered: defaultdict[str, set[int]] = defaultdict(set)
+        for leg, path in zip(result.evidence_legs, result.evidence, strict=True):
+            if all(step.chunk.chunk_id in cited for step in path.steps):
+                covered[path.target].add(leg)
+        if any(len(proof) == result.required_legs for proof in covered.values()):
+            return answer
+        return Answer(None, (), context)
 
     def ask(
         self,

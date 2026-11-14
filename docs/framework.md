@@ -52,8 +52,11 @@ It does not judge whether the generated claim entails the evidence.
   An invalid chain produces an abstention in `ask_knowledge`. Use `reason`
   with an explicit plan when the application already knows the chain.
   Use `KnowledgeIntersection((path_a, path_b))` to find endpoints reachable
-  from both paths. Each returned answer needs a complete proof from every
-  path; raise the context limit if the proof spans more passages.
+  from both paths. An answer must cite all passages in at least one complete
+  proof for an endpoint. Raise the context limit if the proof spans more passages.
+  The Ollama planner can propose either form. The framework validates types
+  and paths. For questions that require precise semantics, supply a plan
+  directly or evaluate the chosen model against your domain's questions.
 - `retrieve(question, mode="global")` broadens the context beyond matching
   one entity. It groups the scoped facts into connected components and
   balances citations across groups and documents. `ask` can summarize

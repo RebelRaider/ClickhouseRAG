@@ -7,6 +7,9 @@ from typing import Protocol
 from clickhouserag._validation import _MAX_LIMIT, integer
 from clickhouserag.graph import GraphPath, GraphStore, canonical_entity
 
+_MAX_LEGS = 8
+_MAX_CHAIN = 4
+
 
 @dataclass(frozen=True, slots=True)
 class Predicate:
@@ -43,13 +46,17 @@ class KnowledgePlanner(Protocol):
     def plan(
         self, question: str, schema: tuple[Predicate, ...]
     ) -> KnowledgeQuery | KnowledgeIntersection | None:
-        """Return a typed relation chain. The framework validates it before querying."""
+        """Return one typed chain or an intersection to validate before querying."""
         ...
 
 
 @dataclass(frozen=True, slots=True)
 class KnowledgeResult:
-    """Matched endpoints and the paths that justify each one."""
+    """Matched endpoints and the paths that justify each one.
+
+    Each index in evidence_legs identifies the input leg for the corresponding
+    evidence path. Every reported endpoint has a proof for each required leg.
+    """
 
     entities: tuple[str, ...]
     evidence: tuple[GraphPath, ...]
@@ -88,7 +95,7 @@ class Knowledge:
         """Find cited paths matching every predicate in the validated chain."""
         integer(limit, "limit", _MAX_LIMIT)
         queries = query.paths if isinstance(query, KnowledgeIntersection) else (query,)
-        if not 1 <= len(queries) <= 8:
+        if not 1 <= len(queries) <= _MAX_LEGS:
             raise KnowledgePlanError("knowledge intersections require one to eight paths")
         try:
             chains = [self._validate_chain(path) for path in queries]
@@ -132,7 +139,7 @@ class Knowledge:
 
     def _validate_chain(self, query: KnowledgeQuery) -> tuple[tuple[str, ...], tuple[str, ...]]:
         canonical_entity(query.entity)
-        if not 1 <= len(query.predicates) <= 4:
+        if not 1 <= len(query.predicates) <= _MAX_CHAIN:
             raise KnowledgePlanError("knowledge queries require one to four predicates")
         entity_type = canonical_entity(query.entity_type)
         types = [entity_type]

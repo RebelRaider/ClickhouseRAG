@@ -392,5 +392,12 @@ def test_intersection_requires_citations_from_each_path(
         "ref:worker",
         "ref:audit",
     }
+    with patch.object(
+        model,
+        "generate",
+        side_effect=lambda _, context: GeneratedAnswer("Vault", [context.passages[0].chunk_id]),
+    ):
+        partial = reader.ask_knowledge("Shared database?", limit=4)
+    assert partial.text is None and not partial.citations and len(partial.context.passages) == 4
     rag.index(Document("audit", "Audit writes Vault.", "ref:audit", {"team": "private"}))
     assert rag.reason(query, metadata={"team": "ops"}).entities == ()

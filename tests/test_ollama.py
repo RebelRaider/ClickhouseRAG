@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from clickhouserag import Chunk, Context, KnowledgeQuery, Predicate
+from clickhouserag import Chunk, Context, KnowledgeIntersection, KnowledgeQuery, Predicate
 from clickhouserag.ollama import ModelResponseError, Ollama
 
 
@@ -26,7 +26,7 @@ def test_provider_implements_structured_requests_and_citations() -> None:
             _chat(
                 {"relations": [{"subject": "Gateway", "predicate": "calls", "object": "Ledger"}]}
             ),
-            _chat({"entity": "Gateway", "predicates": ["calls"]}),
+            _chat({"paths": [{"entity": "Gateway", "predicates": ["calls"]}]}),
             _chat({"answer": "Ledger", "citations": ["1"]}),
         ]
         assert adapter.embed_query("query") == [1, 0]
@@ -45,7 +45,8 @@ def test_provider_implements_structured_requests_and_citations() -> None:
         extractor_request = json.loads(connection.request.call_args_list[1].args[2])
         assert extractor_request["format"]["properties"]["relations"]["maxItems"] == 3
         planner_request = json.loads(connection.request.call_args_list[2].args[2])
-        assert planner_request["format"]["properties"]["predicates"]["items"]["enum"] == ["calls"]
+        path_fields = planner_request["format"]["properties"]["paths"]["items"]["properties"]
+        assert path_fields["predicates"]["items"]["enum"] == ["calls"]
         request = json.loads(connection.request.call_args.args[2])
         assert request["format"]["required"] == ["answer", "citations"]
         assert request["format"]["properties"]["citations"]["items"]["enum"] == ["1"]
@@ -63,6 +64,26 @@ def test_provider_rejects_extractions_beyond_the_requested_budget() -> None:
         pytest.raises(ModelResponseError, match="invalid relationship list"),
     ):
         adapter.extract(passage)
+
+
+def test_planner_intersects_paths_and_requires_entities_in_the_question() -> None:
+    schema = (Predicate("calls", "service", "service"),)
+    adapter = Ollama(embedding_model="embed", chat_model="chat", dimensions=2, schema=schema)
+    paths = [{"entity": name, "predicates": ["calls"]} for name in ("Gateway", "Worker")]
+    with patch.object(adapter, "_structured", return_value={"paths": paths}):
+        assert adapter.plan(
+            "Who do Gateway and Worker both call?", schema
+        ) == KnowledgeIntersection(
+            (
+                KnowledgeQuery("Gateway", "service", ("calls",)),
+                KnowledgeQuery("Worker", "service", ("calls",)),
+            )
+        )
+        assert adapter.plan("Who does Gateway call?", schema) is None
+    with patch.object(adapter, "_structured", return_value={"paths": [paths[0], paths[0]]}):
+        assert adapter.plan("Who does Gateway call?", schema) == KnowledgeQuery(
+            "Gateway", "service", ("calls",)
+        )
 
 
 def test_provider_rejects_unexpected_citations_and_http_failures() -> None:
