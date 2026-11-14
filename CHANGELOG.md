@@ -4,6 +4,10 @@
 
 ## v1.1.0-rc.1 (2026-11-14)
 
+Hybrid is the default for document retrieval and answers. Choose
+`mode="mixed"` or `mode="graph"` for relationship expansion. The HotpotQA
+bridge benchmark reports the evidence, answer and citation trade-offs.
+
 ### Bug Fixes
 
 - **graph**: Distinguish typed nodes and bound evidence interleaving cost

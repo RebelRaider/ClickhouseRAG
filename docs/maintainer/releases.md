@@ -19,6 +19,12 @@ on the merge commit, create an annotated tag at that commit and push the single
 tag. Tags use `vMAJOR.MINOR.PATCH` with an optional `-alpha.N`, `-beta.N` or
 `-rc.N`. The tag must agree with the PEP 440 version in `pyproject.toml`.
 
+For an RC, create `release/<major>.<minor>-rc` from the integrated feature
+branch before running semantic-release. The branch's prerelease configuration
+generates the RC version and changelog. Merge the reviewed candidate into main
+before tagging. To promote it, generate the next stable version on main,
+refresh the lockfile and review those changes through a release pull request.
+
 ```sh
 git tag -a v1.0.0 -m "ClickHouse RAG 1.0.0" <verified-merge-sha>
 git push origin refs/tags/v1.0.0
