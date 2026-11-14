@@ -2,6 +2,26 @@
 
 <!-- version list -->
 
+## v1.2.0-rc.1 (2026-11-14)
+
+### Features
+
+- **ingestion**: Support custom chunking and versioned index preparation
+  ([`a1a3e24`](https://github.com/RebelRaider/ClickhouseRAG/commit/a1a3e24f8682e61c4d38f31f4d1377b51836d3c6))
+
+- **ingestion**: Synchronize PostgreSQL document revisions to ClickHouse
+  ([`f1e4500`](https://github.com/RebelRaider/ClickhouseRAG/commit/f1e45005ff0fcdd0e749754b6eda4a38286e9bca))
+
+- **models**: Compose native and compatible inference providers
+  ([`d0a1c30`](https://github.com/RebelRaider/ClickhouseRAG/commit/d0a1c30d4857bfd230e1d77b5caf39efe802fba3))
+
+- **models**: Support Azure v1 keys and refreshing gateway credentials
+  ([`40c7a27`](https://github.com/RebelRaider/ClickhouseRAG/commit/40c7a27fa82fb447d702e729e646f01b06df7760))
+
+- **retrieval**: Rerank scoped candidates with native model providers
+  ([`63299dc`](https://github.com/RebelRaider/ClickhouseRAG/commit/63299dc41637452e7daff77fa4fdc764e77dd8b1))
+
+
 ## v1.1.0 (2026-11-14)
 
 - Add the document-oriented `RAG` API with atomic revision visibility and

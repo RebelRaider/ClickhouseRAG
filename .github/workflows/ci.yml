@@ -75,7 +75,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ matrix.python }}
           enable-cache: false
-      - run: uv run --locked pytest -m "not integration"
+      - run: uv run --locked pytest -m "not integration" --ignore=tests/integration/test_postgres.py
 
   integration:
     name: ClickHouse ${{ matrix.version }}
@@ -170,3 +170,10 @@ jobs:
           CLICKHOUSE_USER: chrag
           CLICKHOUSE_PASSWORD: ci-only
         run: uv run --locked --extra postgres pytest tests/integration/test_postgres.py
+      - name: Install the PostgreSQL extra from built distributions
+        run: |
+          uv build
+          for artifact in dist/*.whl dist/*.tar.gz; do
+            uv run --no-project --isolated --with "$artifact[postgres]" \
+              python -c 'from clickhouserag.postgres import PostgresOutbox; PostgresOutbox()'
+          done
