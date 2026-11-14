@@ -1,5 +1,7 @@
 # ClickHouse RAG
 
+<img src="assets/clickhouserag-icon.png" width="96" height="96" alt="ClickHouse RAG logo">
+
 ClickHouse RAG is a Python retrieval layer for applications that already run
 ClickHouse. Store text passages alongside embeddings and provenance, query by
 namespace and metadata, and hand the ranked passages to your application or

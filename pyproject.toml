@@ -5,12 +5,21 @@ build-backend = "hatchling.build"
 [project]
 name = "clickhouserag"
 version = "1.0.0"
-description = "Filter-scoped retrieval for RAG applications backed by ClickHouse"
+description = "Dense, lexical and hybrid retrieval for RAG applications on ClickHouse"
 readme = "README.md"
 requires-python = ">=3.11,<3.16"
 license = "MIT"
 license-files = ["LICENSE"]
-keywords = ["clickhouse", "rag", "hybrid-search", "vector-search", "retrieval"]
+keywords = [
+    "clickhouse",
+    "retrieval-augmented-generation",
+    "rag",
+    "hybrid-search",
+    "vector-search",
+    "full-text-search",
+    "information-retrieval",
+    "embeddings",
+]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -21,11 +30,14 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3.15",
     "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: Indexing",
     "Typing :: Typed",
 ]
 dependencies = ["clickhouse-connect>=1.12,<2"]
 
 [project.urls]
+Changelog = "https://github.com/RebelRaider/ClickhouseRAG/blob/main/CHANGELOG.md"
 Documentation = "https://rebelraider.github.io/ClickhouseRAG/"
 Repository = "https://github.com/RebelRaider/ClickhouseRAG"
 Issues = "https://github.com/RebelRaider/ClickhouseRAG/issues"
@@ -66,7 +78,7 @@ mode = "update"
 packages = ["src/clickhouserag"]
 
 [tool.hatch.build.targets.sdist]
-include = ["/src", "/tests", "/examples", "/README.md", "/LICENSE", "/CHANGELOG.md"]
+include = ["/src", "/tests", "/examples", "/README.md", "/LICENSE", "/CHANGELOG.md", "/docs/assets/clickhouserag-icon.png"]
 
 [tool.ruff]
 target-version = "py311"
