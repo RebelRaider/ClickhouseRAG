@@ -38,6 +38,9 @@ classifiers = [
 ]
 dependencies = ["clickhouse-connect>=1.12,<2"]
 
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.3.9,<4"]
+
 [project.urls]
 Changelog = "https://github.com/RebelRaider/ClickhouseRAG/blob/main/CHANGELOG.md"
 Documentation = "https://rebelraider.github.io/ClickhouseRAG/"
@@ -97,7 +100,10 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers"
 testpaths = ["tests"]
-markers = ["integration: requires a real ClickHouse server"]
+markers = [
+    "integration: requires a real ClickHouse server",
+    "postgres: additionally requires a real PostgreSQL server",
+]
 xfail_strict = true
 
 [tool.coverage.run]
