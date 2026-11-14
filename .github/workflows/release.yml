@@ -42,12 +42,25 @@ jobs:
     uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository] (GitHub documents local workflow paths with ./)
 
   build:
-    name: Build Python distributions
+    name: Build and test release distributions
     needs: ci
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:26.8.36.3@sha256:d426d2f612e1e189c90f9a3f8dcd85a03c6851273833817a296bb327e63aa7a7
+        env:
+          CLICKHOUSE_USER: chrag
+          CLICKHOUSE_PASSWORD: ci-only
+        ports:
+          - 8123/tcp
+        options: >-
+          --health-cmd "clickhouse-client --user chrag --password ci-only --query 'SELECT 1'"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,7 +70,16 @@ jobs:
           version: "0.13.8"
           python-version: "3.14"
           enable-cache: false
-      - run: uv build && uv run --locked twine check --strict dist/*
+      - name: Build, install and run the exact release files
+        env:
+          CLICKHOUSE_PORT: ${{ job.services.clickhouse.ports['8123'] }}
+          CLICKHOUSE_USER: chrag
+          CLICKHOUSE_PASSWORD: ci-only
+        run: |
+          SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          export SOURCE_DATE_EPOCH
+          uv build
+          bash scripts/smoke-artifacts.sh dist
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: distributions

@@ -48,7 +48,7 @@ jobs:
           enable-cache: false
       - run: |
           uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file "${RUNNER_TEMP}/runtime.txt"
-          uv run --locked pip-audit --require-hashes --no-deps -r "${RUNNER_TEMP}/runtime.txt"
+          uv run --locked pip-audit --require-hashes -r "${RUNNER_TEMP}/runtime.txt"
 
   test:
     name: Python ${{ matrix.python }} on ${{ matrix.os }}

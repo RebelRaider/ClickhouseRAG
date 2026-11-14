@@ -1,0 +1,23 @@
+name: Bug report
+description: Report a problem you can reproduce
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: ClickHouse RAG, Python, ClickHouse and clickhouse-connect versions
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include sanitized input and a small example. Remove credentials and private data.
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Expected and observed behavior
+    validations:
+      required: true

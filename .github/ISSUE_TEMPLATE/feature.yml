@@ -1,0 +1,17 @@
+name: Feature request
+description: Describe a retrieval or operational need
+body:
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What are you trying to accomplish with ClickHouse RAG?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Example and success criteria
+      description: Include a representative query, a data shape, or an expected outcome.
+    validations:
+      required: true
