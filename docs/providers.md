@@ -127,3 +127,22 @@ The same applies to gateways and Azure or self-hosted deployments. Use the
 contract supported by the selected engine. `StructuredLLM` also accepts
 custom transports through the `JsonModel` protocol, including SDK-backed
 authentication, or application providers can implement the RAG roles directly.
+
+## Managed runtimes
+
+For [Amazon Bedrock](https://docs.aws.amazon.com/bedrock/latest/userguide/structured-output.html),
+pass an authenticated Bedrock Runtime client's `converse` method to
+`BedrockConverse`. Wrap the adapter with `StructuredLLM` and select a
+model or inference profile with structured output support. `BedrockTitanEmbeddings`
+accepts the client's `invoke_model` method and a deployment identifier,
+such as the AWS partition and region. It uses Titan Text Embeddings V2.
+Configure IAM, AWS region, timeouts and retries in your SDK client.
+
+For [Google Cloud publisher models](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/projects.locations.publishers.models/generateContent),
+`VertexGeminiChat` calls `generateContent` and `VertexTextEmbeddings`
+calls [`predict`](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/models/text-embeddings-api).
+Supply the project, location and a current OAuth access token or callable
+returning one. Configure Application Default Credentials and token refresh
+in your application. Choose a regional endpoint supported by the embedding
+model. The default one-item batch supports models that accept a single text
+per prediction request.
