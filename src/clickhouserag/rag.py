@@ -320,24 +320,28 @@ class RAG:
         self,
         question: str,
         *,
+        plan: KnowledgeQuery | KnowledgeIntersection | None = None,
         metadata: Mapping[str, str] | None = None,
         limit: int = 10,
     ) -> Answer:
-        """Plan and execute typed reasoning, then answer using its complete paths."""
+        """Execute typed reasoning and answer with cited proof, optionally using a supplied plan."""
         nonblank(question, "question")
         integer(limit, "limit", _MAX_LIMIT)
-        if self._planner is None:
-            raise ValueError("ask_knowledge requires a knowledge planner")
         if self._generator is None:
             raise ValueError("ask_knowledge requires an answer provider")
         filters = string_map(metadata) if metadata is not None else None
-        plan = self._planner.plan(question, self._schema)
         if plan is None:
-            return Answer(None, (), Context(()))
-        try:
+            if self._planner is None:
+                raise ValueError("ask_knowledge requires a knowledge planner or an explicit plan")
+            proposed = self._planner.plan(question, self._schema)
+            try:
+                result = self.reason(proposed, metadata=filters, limit=limit) if proposed else None
+            except KnowledgePlanError:
+                result = None
+            if result is None:
+                return Answer(None, (), Context(()))
+        else:
             result = self.reason(plan, metadata=filters, limit=limit)
-        except KnowledgePlanError:
-            return Answer(None, (), Context(()))
         context = _knowledge_context(result, limit)
         answer = self._answer(question, context)
         if answer.text is None:

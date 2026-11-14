@@ -98,6 +98,13 @@ def test_document_to_cited_answer(rag: RAG) -> None:
     answer = rag.ask(query, limit=2, metadata={"team": "ops"})
     assert answer.text == "vault"
     assert rag.ask_knowledge(query, limit=2).citations == answer.citations
+    with patch.object(ToyProvider, "plan", side_effect=AssertionError("unused planner")):
+        explicit = rag.ask_knowledge(
+            query, plan=KnowledgeQuery("Gateway", "service", ("calls", "writes")), limit=2
+        )
+        assert explicit.text == answer.text and explicit.citations == answer.citations
+        with pytest.raises(KnowledgePlanError):
+            rag.ask_knowledge(query, plan=KnowledgeQuery("Gateway", "service", ("absent",)))
     assert rag.ask_knowledge("Who owns Jupiter?").text is None
     assert rag.ask_knowledge("Invalid").text is None
     assert [chunk.source for chunk in answer.citations] == ["ref:gateway", "ref:ledger"]

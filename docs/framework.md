@@ -51,8 +51,10 @@ It does not judge whether the generated claim entails the evidence.
   traversal bounds. Pass a `KnowledgePlanner` and call `ask_knowledge(question)`
   to translate a natural-language question to a typed plan before reasoning.
   Plans are validated against the schema and executed with bound parameters.
-  An invalid chain produces an abstention in `ask_knowledge`. Use `reason`
-  with an explicit plan when the application already knows the chain.
+  An invalid chain proposed by a planner produces an abstention. If your
+  application has a plan, pass it to `ask_knowledge(question, plan=plan)` for
+  a cited answer or to `reason(plan)` for the endpoints and paths. An invalid
+  caller-supplied plan raises `KnowledgePlanError`.
   Use `KnowledgeIntersection((path_a, path_b))` to find endpoints reachable
   from both paths. An answer must cite all passages in at least one complete
   proof for an endpoint. Raise the context limit if the proof spans more passages.
