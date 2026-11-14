@@ -465,3 +465,30 @@ def test_reranking_receives_scoped_candidates_and_preserves_citations(
     with patch.object(model, "rank", side_effect=replace_while_ranking):
         context = rag.retrieve("Gateway", mode="dense", metadata={"team": "ops"}, limit=1)
     assert [chunk.source for chunk in context.passages] == ["ref:gateway"]
+
+
+def test_index_pipeline_revision_republishes_same_source_with_new_chunking(
+    database_client: Client, table: str
+) -> None:
+    class Lines:
+        def split(self, text: str) -> list[str]:
+            return text.splitlines()
+
+    class One:
+        def split(self, text: str) -> list[str]:
+            return [text.replace("\n", " ")]
+
+    model = ToyProvider()
+    source = Document("runbook", "Gateway calls Ledger.\nLedger writes Vault.", "ref:runbook")
+    original = RAG(
+        database_client, model, table=table, dimensions=2, chunker=Lines(), index_revision="lines"
+    )
+    original.initialize()
+    assert original.index(source) == 2
+    assert original.index(source) == 0
+    updated = RAG(
+        database_client, model, table=table, dimensions=2, chunker=One(), index_revision="one"
+    )
+    assert updated.index(source) == 1
+    passages = updated.retrieve("Ledger", mode="lexical").passages
+    assert [(chunk.revision, chunk.source) for chunk in passages] == [(2, "ref:runbook")]

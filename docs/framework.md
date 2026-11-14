@@ -167,3 +167,14 @@ Use `reason(plan)` when the endpoint and its paths are sufficient. It does not
 invoke the answer model. In the local example Qwen 2.5 1.5B returned the two-hop
 answer in mixed mode. With full proof citation checks enabled, the generated
 KAG answer abstained while the explicit plan still resolved the endpoint.
+
+## Customize document preparation
+
+Pass a `Chunker` to `RAG` when you need section-based, token-based or semantic
+splitting. Its `split(text)` method yields nonblank passages in source order.
+ClickHouse RAG assigns the document ID, source URI, metadata and revision to
+each passage. With a custom chunker you must provide `index_revision`.
+Set an `index_revision` when changing the extraction model or schema too.
+This lets a changed indexing pipeline republish an otherwise identical
+document when using automatic revision assignment. With explicit revisions,
+enqueue a new revision for each affected source document.
