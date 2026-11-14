@@ -1,6 +1,6 @@
 """Framework-independent retrieval for ClickHouse-backed RAG applications."""
 
-from clickhouserag.evaluation import CaseScore, EvalCase, Evaluation, evaluate
+from clickhouserag.evaluation import CaseScore, EvalCase, Evaluation, Metrics, evaluate
 from clickhouserag.graph import GraphPath, GraphStep, GraphStore, Relation
 from clickhouserag.knowledge import (
     Knowledge,
@@ -45,6 +45,7 @@ __all__ = [
     "KnowledgePlanner",
     "KnowledgeQuery",
     "KnowledgeResult",
+    "Metrics",
     "Predicate",
     "Relation",
     "RelationExtractor",

@@ -1,5 +1,6 @@
 """Deterministic retrieval and citation evaluation with per-case timings."""
 
+from collections import defaultdict
 from collections.abc import Callable, Iterable, Sequence, Set
 from dataclasses import dataclass
 from math import ceil, log2
@@ -39,11 +40,9 @@ class CaseScore:
 
 
 @dataclass(frozen=True, slots=True)
-class Evaluation:
-    """Macro metrics over applicable cases, keeping measurements per query."""
+class Metrics:
+    """Macro metrics over evaluated cases for one retrieval or answer run."""
 
-    k: int
-    cases: tuple[CaseScore, ...]
     recall: float | None
     mrr: float | None
     ndcg: float | None
@@ -52,6 +51,15 @@ class Evaluation:
     citation_recall: float | None
     abstention_accuracy: float | None
     latency_p95_ms: float
+
+
+@dataclass(frozen=True, slots=True)
+class Evaluation(Metrics):
+    """Overall and category-level metrics, with individual case measurements."""
+
+    k: int
+    cases: tuple[CaseScore, ...]
+    by_category: dict[str, Metrics]
 
 
 def evaluate(
@@ -69,25 +77,45 @@ def evaluate(
         raise ValueError("evaluation case IDs must be unique")
     for case in items:
         nonblank(case.case_id, "case ID")
+        nonblank(case.category, "category")
         nonblank(case.query, "query")
         if case.answers and not case.relevant:
             raise ValueError("an answerable case must have relevant passage IDs")
     scores = tuple(_run_case(case, run, k) for case in items)
-    latencies = sorted(score.elapsed_ms for score in scores)
-    abstentions = [
-        score.abstained == (not case.relevant)
-        for case, score in zip(items, scores, strict=True)
-        if score.abstained is not None
-    ]
+    pairs = list(zip(items, scores, strict=True))
+    grouped: defaultdict[str, list[tuple[EvalCase, CaseScore]]] = defaultdict(list)
+    for item, score in pairs:
+        grouped[item.category].append((item, score))
+    aggregate = _aggregate(pairs)
     return Evaluation(
+        aggregate.recall,
+        aggregate.mrr,
+        aggregate.ndcg,
+        aggregate.exact_match,
+        aggregate.citation_precision,
+        aggregate.citation_recall,
+        aggregate.abstention_accuracy,
+        aggregate.latency_p95_ms,
         k,
         scores,
-        _macro(score.recall for score in scores),
-        _macro(score.reciprocal_rank for score in scores),
-        _macro(score.ndcg for score in scores),
-        _macro(score.exact_match for score in scores),
-        _macro(score.citation_precision for score in scores),
-        _macro(score.citation_recall for score in scores),
+        {name: _aggregate(group) for name, group in sorted(grouped.items())},
+    )
+
+
+def _aggregate(pairs: list[tuple[EvalCase, CaseScore]]) -> Metrics:
+    latencies = sorted(score.elapsed_ms for _, score in pairs)
+    abstentions = [
+        score.abstained == (not case.relevant)
+        for case, score in pairs
+        if score.abstained is not None
+    ]
+    return Metrics(
+        _macro(score.recall for _, score in pairs),
+        _macro(score.reciprocal_rank for _, score in pairs),
+        _macro(score.ndcg for _, score in pairs),
+        _macro(score.exact_match for _, score in pairs),
+        _macro(score.citation_precision for _, score in pairs),
+        _macro(score.citation_recall for _, score in pairs),
         mean(abstentions) if abstentions else None,
         latencies[ceil(len(latencies) * 0.95) - 1],
     )

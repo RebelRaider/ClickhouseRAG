@@ -31,6 +31,9 @@ def test_evaluation_reports_ranking_citations_and_abstention() -> None:
     assert result.cases[0].retrieved == ("miss", "hit")
     assert result.cases[1].recall is None
     assert result.latency_p95_ms >= 0
+    assert result.by_category["multi-hop"].recall == 0.5
+    assert result.by_category["unanswerable"].recall is None
+    assert result.by_category["unanswerable"].abstention_accuracy == 1
 
 
 def test_evaluation_invalid_cases_rejected_before_run() -> None:

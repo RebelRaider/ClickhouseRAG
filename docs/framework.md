@@ -60,7 +60,7 @@ an optional set of accepted exact answers and a category. An empty relevance
 set labels an unanswerable case. `evaluate` takes a callable returning
 `Context` or `Answer`; it reports Recall@k, MRR@k, binary nDCG@k, plus exact
 answer matching and citation metrics when available. It preserves the
-per-case category and reports wall-clock latency. Exact matching uses
+per-case scores, reports aggregates by category, and measures wall-clock latency. Exact matching uses
 case-folding and normalizes whitespace. For free-form answers use a separate
 claim-level human or model-based judging process.
 
