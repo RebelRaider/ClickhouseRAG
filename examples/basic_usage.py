@@ -14,6 +14,7 @@ def main() -> None:
         username=os.getenv("CLICKHOUSE_USER", "default"),
         password=os.getenv("CLICKHOUSE_PASSWORD", ""),
         autogenerate_session_id=False,
+        form_encode_query_params=True,
     ) as client:
         store = ClickHouseStore(
             client, table="chrag_quickstart_v1", embedding_model="toy-v1", dimensions=2

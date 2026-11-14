@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, "release/**"]
+  push:
+    branches: [main, "release/**"]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  UV_VERSION: "0.13.8"
+
+jobs:
+  quality:
+    name: Code quality and documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.14"
+          enable-cache: false
+      - run: bash scripts/check.sh
+
+  audit:
+    name: Audit package dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.14"
+          enable-cache: false
+      - run: |
+          uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file "${RUNNER_TEMP}/runtime.txt"
+          uv run --locked pip-audit --require-hashes --no-deps -r "${RUNNER_TEMP}/runtime.txt"
+
+  test:
+    name: Python ${{ matrix.python }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.11", "3.12", "3.13", "3.14", "3.15"]
+        include:
+          - os: macos-latest
+            python: "3.14"
+          - os: windows-latest
+            python: "3.14"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ matrix.python }}
+          enable-cache: false
+      - run: uv run --locked pytest -m "not integration"
+
+  integration:
+    name: ClickHouse ${{ matrix.version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: 26.3.62.3
+            image: clickhouse/clickhouse-server:26.3.62.3@sha256:de3e47c64078aa196dae2349e048fc98ba81947f651f5c20e06e46baea8ae40a
+          - version: 26.8.36.3
+            image: clickhouse/clickhouse-server:26.8.36.3@sha256:d426d2f612e1e189c90f9a3f8dcd85a03c6851273833817a296bb327e63aa7a7
+    services:
+      clickhouse:
+        image: ${{ matrix.image }}
+        env:
+          CLICKHOUSE_USER: chrag
+          CLICKHOUSE_PASSWORD: ci-only
+        ports:
+          - 8123/tcp
+        options: >-
+          --health-cmd "clickhouse-client --user chrag --password ci-only --query 'SELECT 1'"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      CLICKHOUSE_USER: chrag
+      CLICKHOUSE_PASSWORD: ci-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.14"
+          enable-cache: false
+      - name: Run integration tests
+        env:
+          CLICKHOUSE_PORT: ${{ job.services.clickhouse.ports['8123'] }}
+        run: uv run --locked pytest --junitxml="${RUNNER_TEMP}/integration.xml" -m integration
+      - name: Check that integration tests ran without skips
+        run: python -c 'import os, xml.etree.ElementTree as ET; suite = ET.parse(os.environ["RUNNER_TEMP"] + "/integration.xml").find(".//testsuite"); assert int(suite.attrib["tests"]) > 0 and int(suite.attrib["skipped"]) == 0'
+      - name: Install and run each distribution
+        env:
+          CLICKHOUSE_PORT: ${{ job.services.clickhouse.ports['8123'] }}
+        run: bash scripts/smoke-artifacts.sh

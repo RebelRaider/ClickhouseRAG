@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clickhouserag"
-version = "1.0.0b1"
+version = "1.0.0rc1"
 description = "Filter-scoped retrieval for RAG applications backed by ClickHouse"
 readme = "README.md"
 requires-python = ">=3.11,<3.16"
@@ -39,13 +39,33 @@ dev = [
     "ruff>=0.15",
     "twine>=6.2",
     "ty>=0.0.28",
+    "zizmor>=1.32",
 ]
+
+docs = ["mkdocs>=1.6,<2", "mkdocstrings[python]>=0.29"]
+release = ["python-semantic-release==10.7.0"]
+
+[tool.uv]
+required-version = ">=0.13.8"
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version:pep621"]
+commit_parser = "conventional"
+tag_format = "v{version}"
+major_on_zero = true
+
+[tool.semantic_release.branches.main]
+match = "main"
+prerelease = false
+
+[tool.semantic_release.changelog]
+mode = "update"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/clickhouserag"]
 
 [tool.hatch.build.targets.sdist]
-include = ["/src", "/tests", "/examples", "/README.md", "/LICENSE"]
+include = ["/src", "/tests", "/examples", "/README.md", "/LICENSE", "/CHANGELOG.md"]
 
 [tool.ruff]
 target-version = "py311"

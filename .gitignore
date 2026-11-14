@@ -162,3 +162,7 @@ cython_debug/
 #.idea/
 local.session.sql
 backup.json
+
+# Local documentation and test artifacts
+site/
+.hypothesis/

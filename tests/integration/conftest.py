@@ -20,6 +20,7 @@ def database_client() -> Iterator[Client]:
         username=os.getenv("CLICKHOUSE_USER", "default"),
         password=os.getenv("CLICKHOUSE_PASSWORD", ""),
         autogenerate_session_id=False,
+        form_encode_query_params=True,
     ) as client:
         yield client
 

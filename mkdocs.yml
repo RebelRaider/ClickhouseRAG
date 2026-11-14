@@ -1,0 +1,27 @@
+site_name: ClickHouse RAG
+site_description: Dense, lexical and hybrid retrieval backed by ClickHouse
+site_url: https://rebelraider.github.io/ClickhouseRAG/
+repo_url: https://github.com/RebelRaider/ClickhouseRAG
+repo_name: RebelRaider/ClickhouseRAG
+theme:
+  name: mkdocs
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - API reference: api.md
+  - Operations: operations.md
+  - Upgrade from 0.x: migration.md
+  - Retrieval benchmark: benchmark.md
+  - Maintainers:
+      - Design: maintainer/design.md
+      - Releases: maintainer/releases.md
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+markdown_extensions:
+  - admonition
+  - fenced_code
+  - tables
