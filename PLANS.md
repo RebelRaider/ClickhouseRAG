@@ -30,3 +30,17 @@ may be published. The GitHub and PyPI states must be checked independently.
 - CI exercises the supported Python range and real 26.3 and 26.8 LTS servers.
 - Benchmarks report data, seed, conditions, quality and latency. Synthetic results
   are labelled as such. ANN promotion requires plan and recall evidence.
+
+
+## Delivery record
+
+- Design, alpha and beta are preserved in separate branches. The RC was
+  merged through [PR #1](https://github.com/RebelRaider/ClickhouseRAG/pull/1)
+  and [released on GitHub](https://github.com/RebelRaider/ClickhouseRAG/releases/tag/v1.0.0-rc.1).
+- Stable 1.0.0 was promoted through
+  [PR #3](https://github.com/RebelRaider/ClickhouseRAG/pull/3).
+  See the [release run](https://github.com/RebelRaider/ClickhouseRAG/actions/runs/43591253502),
+  [release files](https://github.com/RebelRaider/ClickhouseRAG/releases/tag/v1.0.0)
+  and [hosted documentation](https://rebelraider.github.io/ClickhouseRAG/).
+- PyPI publishing uses the existing project and requires its owner to
+  configure Trusted Publishing. The tag is already available on GitHub.

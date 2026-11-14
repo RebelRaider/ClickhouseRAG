@@ -13,6 +13,9 @@ with namespace and metadata filters and a source pointer on every result.
 Version 1.0 replaces the old managers and requires a new table. See the
 [migration guide](docs/migration.md) for an existing setup.
 
+[Download the stable release](https://github.com/RebelRaider/ClickhouseRAG/releases/latest) ·
+[Hosted documentation](https://rebelraider.github.io/ClickhouseRAG/)
+
 ## Quickstart
 
 The 1.x line targets CPython 3.11–3.15 and ClickHouse 26.3 or 26.8 LTS.
