@@ -35,11 +35,13 @@ def main() -> None:
         rag.index(Document("ledger", "Ledger writes Vault.", "https://example.org/ledger"))
 
         question = "What database is written to by a service that Gateway calls?"
-        for ask in (rag.ask, rag.ask_knowledge):
-            answer = ask(question)
-            print(ask.__name__, answer.text, [item.source for item in answer.citations])
-        planned = rag.reason(KnowledgeQuery("Gateway", "service", ("calls", "writes")))
+        answer = rag.ask(question, mode="mixed")
+        print("mixed", answer.text, [item.source for item in answer.citations])
+        plan = KnowledgeQuery("Gateway", "service", ("calls", "writes"))
+        planned = rag.reason(plan)
         print("explicit plan", planned.entities)
+        answer = rag.ask_knowledge(question)
+        print("knowledge", answer.text, [item.source for item in answer.citations])
 
 
 if __name__ == "__main__":

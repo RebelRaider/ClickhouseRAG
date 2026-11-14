@@ -136,7 +136,7 @@ with clickhouse_connect.get_client(
     rag.initialize()
     rag.index(Document("gateway", "Gateway calls Ledger.", "https://example.org/gateway"))
     rag.index(Document("ledger", "Ledger writes Vault.", "https://example.org/ledger"))
-    answer = rag.ask_knowledge("What database is written to by a service that Gateway calls?")
+    answer = rag.ask("What database is written to by a service that Gateway calls?", mode="mixed")
     print(answer.text, [chunk.source for chunk in answer.citations])
 ```
 
@@ -157,3 +157,8 @@ quality depends on the schema, corpus and selected models. The adapter requests
 up to twelve relationships per passage by default. Set `max_relations` to
 adjust extraction work for the density of your passages. When the model fails
 to complete a response, the document stays at its previous published revision.
+
+Use `reason(plan)` when the endpoint and its paths are sufficient. It does not
+invoke the answer model. In the local example Qwen 2.5 1.5B returned the two-hop
+answer in mixed mode. With full proof citation checks enabled, the generated
+KAG answer abstained while the explicit plan still resolved the endpoint.

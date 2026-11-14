@@ -48,7 +48,7 @@ def test_provider_implements_structured_requests_and_citations() -> None:
         path_fields = planner_request["format"]["properties"]["paths"]["items"]["properties"]
         assert path_fields["predicates"]["items"]["enum"] == ["calls"]
         request = json.loads(connection.request.call_args.args[2])
-        assert request["format"]["required"] == ["answer", "citations"]
+        assert request["format"]["required"] == ["citations", "answer"]
         assert request["format"]["properties"]["citations"]["items"]["enum"] == ["1"]
         assert json.loads(request["messages"][1]["content"])["evidence"] == [
             {"id": "1", "text": passage.text}
