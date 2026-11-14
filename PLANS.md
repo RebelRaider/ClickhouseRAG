@@ -85,5 +85,11 @@ alongside new provider combinations.
 | Model adapters | OpenAI-compatible embeddings, Chat Completions and Responses, native Ollama, Claude, Gemini, Cohere and Voyage, plus a structured backend extension point | Request/response tests for every wire API and an independently composed ClickHouse + local model run |
 | Pipeline composition | Support independent retrieval, reranking and generation choices, with bounded candidates and stable source IDs | Retrieval-only and full RAG runs, scoped evidence after reranking, ambiguous and failed provider responses |
 | Additional local and managed runtimes | Exercise a local embedding server or in-process model and document capabilities across cloud gateways and engines | CPU or local end-to-end runs, supported Python matrix, optional dependencies stay optional |
-| PostgreSQL add-on | Evaluate using PostgreSQL as a source of authoritative documents or revisioned changes while ClickHouse serves retrieval | Source identity, restartable sync, replacements and deletion, real database tests if promoted |
+| PostgreSQL add-on | Publish committed PostgreSQL document revisions into ClickHouse through an optional outbox | Source identity, restartable sync, replacements, deletion and concurrent workers tested on real databases |
 | Delivery | Docs and tested artifacts for model roles and supported API capabilities | Clean installs, supported Python and ClickHouse CI, reproducible examples without hosted credentials |
+
+Version 1.2.0 shipped the core [provider adapters](docs/providers.md), reranking,
+custom chunking and optional [PostgreSQL delivery](docs/postgres.md). The
+follow-up adds Bedrock, Google Cloud and bounded multi-query planning.
+Hosted adapters use documented wire-contract fixtures in CI. The locally
+verified examples use Ollama and llama.cpp over ClickHouse.
