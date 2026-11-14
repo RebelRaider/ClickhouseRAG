@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.0.1 (2026-11-14)
+
+### Bug Fixes
+
+- **packaging**: Add project identity and useful PyPI metadata
+  ([`35d2e87`](https://github.com/RebelRaider/ClickhouseRAG/commit/35d2e875aa6daf78682c33637505acaad413c6cf))
+
+### Documentation
+
+- Point the quickstart to the published wheel
+  ([`0007aad`](https://github.com/RebelRaider/ClickhouseRAG/commit/0007aad53f7e2de12e37b6ed02b453378ada5abf))
+
+
 ## v1.0.0
 
 - Stable Python API for database-backed dense, lexical and hybrid passage search.

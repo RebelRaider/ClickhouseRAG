@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clickhouserag"
-version = "1.0.0"
+version = "1.0.1"
 description = "Dense, lexical and hybrid retrieval for RAG applications on ClickHouse"
 readme = "README.md"
 requires-python = ">=3.11,<3.16"
