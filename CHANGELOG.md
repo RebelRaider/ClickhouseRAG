@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v1.3.0-rc.1 (2026-11-14)
+
+### Documentation
+
+- **models**: Verify a scoped pipeline across multiple local runtimes
+  ([`ac569a4`](https://github.com/RebelRaider/ClickhouseRAG/commit/ac569a4dbe09f87d6b1a3c14465fe18d700a6b9e))
+
+### Features
+
+- **models**: Add Bedrock Runtime and Google Cloud publisher adapters
+  ([`3d7acb7`](https://github.com/RebelRaider/ClickhouseRAG/commit/3d7acb7f18e06dc89edbadf0278cae712699b77c))
+
+- **retrieval**: Compose several scoped searches into cited answers
+  ([`026b033`](https://github.com/RebelRaider/ClickhouseRAG/commit/026b033a465269e2ec8eb33e26c8acf9fcdd166e))
+
+- **retrieval**: Plan bounded searches with a separate model
+  ([`0c3056a`](https://github.com/RebelRaider/ClickhouseRAG/commit/0c3056a50b7a733190b25741432f0433e0f15e35))
+
+
 ## v1.2.0 (2026-11-14)
 
 - Compose independent models for embeddings, graph extraction, knowledge
