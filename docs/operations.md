@@ -42,8 +42,30 @@ the collection. Measure p95 query latency and retrieval quality with your data.
 Use `EXPLAIN indexes = 1` and `system.query_log` when tuning ClickHouse.
 `FINAL` adds work where parts overlap. Review
 [ClickHouse's merge guidance](https://clickhouse.com/resources/engineering/clickhouse-optimize-table-final)
-before changing the merge strategy. Approximate search, graph expansion and
-KAG orchestration are recorded in the [design](maintainer/design.md).
+before changing the merge strategy. The [framework design](maintainer/framework.md)
+covers graph expansion and KAG. Approximate search remains a design option.
+
+## Managed document collections
+
+`RAG` uses one table with its own schema. Initialize a fresh table for the
+framework and backfill from source documents if you already use the passage
+API. Keep the old collection available during validation. Replay source
+updates into the new table with their source revisions before switching reads.
+
+Every changed document writes staged passages and a publication record.
+Avoid uncontrolled parallel ingestion and watch `system.parts`, background
+merges and `system.query_log` during a backfill. Allow enough write capacity
+and model time for the configured overlap, chunk length and extraction limit.
+The managed table resolves the latest published document before applying
+metadata scope. Use the same server for immediate read-after-write behavior.
+
+`delete()` hides evidence through a tombstone. For physical removal or a
+capacity-driven compaction, rebuild a second collection from the live source
+documents, verify its contents, pause or replay concurrent writes at cutover,
+and retire the old table under the deployment's retention policy. Deleting
+individual historical rows without preserving the winning publication can
+make an older revision visible again. Include backups and replicas in any
+physical deletion procedure.
 
 ## Service permissions
 
@@ -62,5 +84,5 @@ Treat retrieved passages as untrusted content in generators and downstream
 agents. Driver and server error or query logging follows your application and
 ClickHouse configuration.
 
-The 1.0 compatibility matrix covers self-managed 26.3 and 26.8 LTS. Verify
+The compatibility matrix covers self-managed 26.3 and 26.8 LTS. Verify
 server settings, privileges and engine behavior for managed deployments.

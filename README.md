@@ -2,15 +2,19 @@
 
 # ClickHouse RAG
 
-ClickHouse RAG is a Python retrieval layer for teams that already run ClickHouse.
-Store passages and embeddings together. Search by meaning, term match, or both,
-with namespace and metadata filters and a source pointer on every result.
+ClickHouse RAG is a Python framework for finding and citing evidence in
+ClickHouse. Use one collection for document updates, hybrid text and vector
+search, and relationship traversal. Supply your own models or use the
+built-in Ollama adapter.
 
 - **Use your own embeddings.** Pass vectors directly or supply a Python provider.
 - **Keep the latest revision searchable.** The same identity and payload can be
   retried and higher revisions replace earlier passages.
 - **Return evidence for any RAG stack.** Typed search results carry stable
   chunk IDs, document IDs, sources and metadata.
+- **Follow relationships across documents.** Graph search adds cited paths
+  and corpus overviews. Typed knowledge queries can require multiple paths
+  to reach the same answer.
 
 Version 1.0 replaces the old managers and requires a new table. See the
 [migration guide](https://rebelraider.github.io/ClickhouseRAG/migration/) for an existing setup.
@@ -37,8 +41,8 @@ uv sync --locked
 uv run --locked python examples/basic_usage.py
 ```
 
-For the in-development framework API, see the
-[GraphRAG, KAG and evaluation walkthrough](docs/framework.md).
+For document indexing, GraphRAG, KAG and evaluation, use the
+[framework walkthrough](https://rebelraider.github.io/ClickhouseRAG/framework/).
 
 See the [API reference](https://rebelraider.github.io/ClickhouseRAG/api/), [operations guide](https://rebelraider.github.io/ClickhouseRAG/operations/),
 [benchmark](https://rebelraider.github.io/ClickhouseRAG/benchmark/) and [design](https://rebelraider.github.io/ClickhouseRAG/maintainer/design/).
