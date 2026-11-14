@@ -6,6 +6,8 @@ from clickhouserag.evaluation import CaseScore, EvalCase, Evaluation, Metrics, e
 from clickhouserag.graph import GraphPath, GraphStep, GraphStore, Relation
 from clickhouserag.knowledge import (
     Knowledge,
+    KnowledgeIntersection,
+    KnowledgePlanError,
     KnowledgePlanner,
     KnowledgeQuery,
     KnowledgeResult,
@@ -46,6 +48,8 @@ __all__ = [
     "GraphStep",
     "GraphStore",
     "Knowledge",
+    "KnowledgeIntersection",
+    "KnowledgePlanError",
     "KnowledgePlanner",
     "KnowledgeQuery",
     "KnowledgeResult",

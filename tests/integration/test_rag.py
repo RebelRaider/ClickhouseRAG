@@ -14,6 +14,8 @@ from clickhouserag import (
     DocumentRevisionError,
     ExtractedRelation,
     GeneratedAnswer,
+    KnowledgeIntersection,
+    KnowledgePlanError,
     KnowledgeQuery,
     Predicate,
 )
@@ -42,7 +44,9 @@ class ToyProvider:
             )
         ]
 
-    def plan(self, question: str, schema: tuple[Predicate, ...]) -> KnowledgeQuery | None:
+    def plan(
+        self, question: str, schema: tuple[Predicate, ...]
+    ) -> KnowledgeQuery | KnowledgeIntersection | None:
         if question == "Invalid":
             return KnowledgeQuery("gateway", "service", ("missing",))
         return (
@@ -327,3 +331,66 @@ def test_global_answer_passes_grouped_evidence_to_provider(
     result = reader.ask("Which separate workflows are represented?", mode="global")
     assert result.text == "Two themes"
     assert {chunk.source for chunk in result.citations} == {"ref:a", "ref:b"}
+
+
+def test_intersection_requires_citations_from_each_path(
+    rag: RAG, database_client: Client, table: str
+) -> None:
+    for key, text, team in [
+        ("gateway", "Gateway calls Ledger.", "ops"),
+        ("ledger", "Ledger writes Vault.", "ops"),
+        ("worker", "Worker calls Audit.", "ops"),
+        ("audit", "Audit writes Vault.", "ops"),
+        ("extra", "Audit writes Secondary.", "ops"),
+    ]:
+        rag.index(Document(key, text, f"ref:{key}", {"team": team}))
+
+    query = KnowledgeIntersection(
+        (
+            KnowledgeQuery("Gateway", "service", ("calls", "writes")),
+            KnowledgeQuery("Worker", "service", ("calls", "writes")),
+        )
+    )
+    result = rag.reason(query)
+    assert result.entities == ("vault",)
+    assert {path.seed for path in result.evidence} == {"gateway", "worker"}
+    invalid = KnowledgeIntersection(
+        (query.paths[0], KnowledgeQuery("Audit", "service", ("calls",)))
+    )
+    with pytest.raises(KnowledgePlanError, match="endpoint"):
+        rag.reason(invalid)
+
+    class IntersectionModel(ToyProvider):
+        def plan(
+            self, question: str, schema: tuple[Predicate, ...]
+        ) -> KnowledgeQuery | KnowledgeIntersection | None:
+            return query
+
+        def generate(self, question: str, context: Context) -> GeneratedAnswer:
+            assert len(context.paths) == 2
+            return GeneratedAnswer("Vault", [c.chunk_id for c in context.passages])
+
+    model = IntersectionModel()
+    reader = RAG(
+        database_client,
+        model,
+        table=table,
+        dimensions=2,
+        generator=model,
+        planner=model,
+        schema=(
+            Predicate("calls", "service", "service"),
+            Predicate("writes", "service", "database"),
+        ),
+    )
+    assert reader.ask_knowledge("Shared database?", limit=3).text is None
+    answer = reader.ask_knowledge("Shared database?", limit=4)
+    assert answer.text == "Vault"
+    assert {chunk.source for chunk in answer.citations} == {
+        "ref:gateway",
+        "ref:ledger",
+        "ref:worker",
+        "ref:audit",
+    }
+    rag.index(Document("audit", "Audit writes Vault.", "ref:audit", {"team": "private"}))
+    assert rag.reason(query, metadata={"team": "ops"}).entities == ()

@@ -50,6 +50,9 @@ It does not judge whether the generated claim entails the evidence.
   Plans are validated against the schema and executed with bound parameters.
   An invalid chain produces an abstention in `ask_knowledge`. Use `reason`
   with an explicit plan when the application already knows the chain.
+  Use `KnowledgeIntersection((path_a, path_b))` to find endpoints reachable
+  from both paths. Each returned answer needs a complete proof from every
+  path; raise the context limit if the proof spans more passages.
 - `retrieve(question, mode="global")` broadens the context beyond matching
   one entity. It groups the scoped facts into connected components and
   balances citations across groups and documents. `ask` can summarize

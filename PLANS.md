@@ -58,7 +58,7 @@ alongside existing tables. No separate graph or vector service is required.
 | Framework and GraphRAG | Document chunking, extraction provider, automatic query seeds, mixed retrieval, context assembly and optional generation with validated citations | Installable end-to-end example, persisted state, repeat indexing, empty evidence and provider failure |
 | Document lifecycle | Replace and delete a document atomically for readers | Boundary fault, shorter replacements, changed metadata, retry and concurrent generations on both LTS servers |
 | Corpus overview | Global search across groups of scoped relationships | Separate workflows, disconnected evidence, filtered bridges and an explicit scan limit |
-| KAG | Typed relation schema, validated structured plans, bounded reasoning and evidence for each step | Multi-hop, invalid plans, ambiguity and unanswerable queries against real ClickHouse |
+| KAG | Typed relation schema, validated structured plans, path intersections and evidence for each step | Multi-hop, invalid plans, ambiguity and unanswerable queries against real ClickHouse |
 | Evaluation | Labelled dense, hybrid, graph and KAG comparison; ranking, answer/citation and latency metrics | Reproducible corpus and results by mode and query category, empty and failure cases |
 | Stabilization | Migration and operations, quickstart, packaging, CI and design trade-offs | Lowest-friction installed examples, run across supported ClickHouse versions, artifact-level verification |
 

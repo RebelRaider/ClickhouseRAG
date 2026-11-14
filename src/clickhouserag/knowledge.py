@@ -26,6 +26,13 @@ class KnowledgeQuery:
     predicates: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class KnowledgeIntersection:
+    """Find endpoint entities reached by every supplied typed path."""
+
+    paths: tuple[KnowledgeQuery, ...]
+
+
 class KnowledgePlanError(ValueError):
     """A predicate chain cannot be executed against the declared schema."""
 
@@ -33,7 +40,9 @@ class KnowledgePlanError(ValueError):
 class KnowledgePlanner(Protocol):
     """Translate a question into a schema-aware plan or decline to plan it."""
 
-    def plan(self, question: str, schema: tuple[Predicate, ...]) -> KnowledgeQuery | None:
+    def plan(
+        self, question: str, schema: tuple[Predicate, ...]
+    ) -> KnowledgeQuery | KnowledgeIntersection | None:
         """Return a typed relation chain. The framework validates it before querying."""
         ...
 
@@ -44,6 +53,8 @@ class KnowledgeResult:
 
     entities: tuple[str, ...]
     evidence: tuple[GraphPath, ...]
+    evidence_legs: tuple[int, ...]
+    required_legs: int
 
 
 class Knowledge:
@@ -68,7 +79,7 @@ class Knowledge:
 
     def solve(
         self,
-        query: KnowledgeQuery,
+        query: KnowledgeQuery | KnowledgeIntersection,
         *,
         namespace: str = "default",
         metadata: Mapping[str, str] | None = None,
@@ -76,29 +87,51 @@ class Knowledge:
     ) -> KnowledgeResult:
         """Find cited paths matching every predicate in the validated chain."""
         integer(limit, "limit", _MAX_LIMIT)
-        predicates, entity_types = self._validate_chain(query)
-        paths = self._graph.expand(
-            [query.entity],
-            predicates=predicates,
-            entity_types=entity_types,
-            depth=len(predicates),
-            namespace=namespace,
-            metadata=metadata,
-            fanout=32,
-            limit=_MAX_LIMIT,
+        queries = query.paths if isinstance(query, KnowledgeIntersection) else (query,)
+        if not 1 <= len(queries) <= 8:
+            raise KnowledgePlanError("knowledge intersections require one to eight paths")
+        try:
+            chains = [self._validate_chain(path) for path in queries]
+        except ValueError as exc:
+            if isinstance(exc, KnowledgePlanError):
+                raise
+            raise KnowledgePlanError("knowledge query contains an invalid label") from exc
+        if len({entity_types[-1] for _, entity_types in chains}) != 1:
+            raise KnowledgePlanError("intersected paths must have the same endpoint type")
+        bundles: list[dict[str, list[GraphPath]]] = []
+        for path, (predicates, entity_types) in zip(queries, chains, strict=True):
+            matches = self._graph.expand(
+                [path.entity],
+                predicates=predicates,
+                entity_types=entity_types,
+                depth=len(predicates),
+                namespace=namespace,
+                metadata=metadata,
+                fanout=32,
+                limit=_MAX_LIMIT,
+            )
+            grouped: dict[str, list[GraphPath]] = {}
+            for match in matches:
+                grouped.setdefault(match.target, []).append(match)
+            bundles.append(grouped)
+        targets = [name for name in bundles[0] if all(name in group for group in bundles[1:])][
+            :limit
+        ]
+        evidence = [
+            (leg, path)
+            for name in targets
+            for leg, group in enumerate(bundles)
+            for path in group[name]
+        ]
+        return KnowledgeResult(
+            tuple(targets),
+            tuple(path for _, path in evidence),
+            tuple(leg for leg, _ in evidence),
+            len(bundles),
         )
-        evidence = []
-        endpoints: dict[str, None] = {}
-        for path in paths:
-            key = path.target
-            if key not in endpoints:
-                if len(endpoints) == limit:
-                    continue
-                endpoints[key] = None
-            evidence.append(path)
-        return KnowledgeResult(tuple(endpoints), tuple(evidence))
 
     def _validate_chain(self, query: KnowledgeQuery) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        canonical_entity(query.entity)
         if not 1 <= len(query.predicates) <= 4:
             raise KnowledgePlanError("knowledge queries require one to four predicates")
         entity_type = canonical_entity(query.entity_type)

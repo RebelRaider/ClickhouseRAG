@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import zip_longest
@@ -20,6 +21,7 @@ from clickhouserag._validation import _MAX_BATCH, _MAX_LIMIT, integer, nonblank,
 from clickhouserag.graph import GraphPath, GraphStore, Relation, _document_fact
 from clickhouserag.knowledge import (
     Knowledge,
+    KnowledgeIntersection,
     KnowledgePlanError,
     KnowledgePlanner,
     KnowledgeQuery,
@@ -251,7 +253,6 @@ class RAG:
         if self.graph is not None and mode in ("graph", "mixed"):
             selected = self.graph.seed_entities(query, **scope) if seeds is None else seeds
             paths = self.graph.expand(selected, depth=depth, limit=min(limit * 4, 1000), **scope)
-        if self.graph is not None and mode in ("graph", "mixed"):
             hits, paths = self._visible_evidence(hits, paths)
         return _context(hits, paths, limit)
 
@@ -283,7 +284,7 @@ class RAG:
 
     def reason(
         self,
-        query: KnowledgeQuery,
+        query: KnowledgeQuery | KnowledgeIntersection,
         *,
         metadata: Mapping[str, str] | None = None,
         limit: int = 10,
@@ -294,8 +295,26 @@ class RAG:
         result = self._knowledge.solve(
             query, namespace=self._namespace, metadata=metadata, limit=limit
         )
-        _, paths = self._visible_evidence([], result.evidence)
-        return KnowledgeResult(tuple(dict.fromkeys(path.target for path in paths)), tuple(paths))
+        chunks = [step.chunk for path in result.evidence for step in path.steps]
+        visible = self.passages.visible_chunks(self._namespace, chunks)
+        evidence = [
+            (leg, path)
+            for leg, path in zip(result.evidence_legs, result.evidence, strict=True)
+            if all((step.chunk.chunk_id, step.chunk.revision) in visible for step in path.steps)
+        ]
+        proof: defaultdict[str, set[int]] = defaultdict(set)
+        for leg, path in evidence:
+            proof[path.target].add(leg)
+        targets = tuple(
+            target for target in result.entities if len(proof[target]) == result.required_legs
+        )
+        target_set = set(targets)
+        return KnowledgeResult(
+            targets,
+            tuple(path for _, path in evidence if path.target in target_set),
+            tuple(leg for leg, path in evidence if path.target in target_set),
+            result.required_legs,
+        )
 
     def ask_knowledge(
         self,
@@ -309,6 +328,8 @@ class RAG:
         integer(limit, "limit", _MAX_LIMIT)
         if self._planner is None:
             raise ValueError("ask_knowledge requires a knowledge planner")
+        if self._generator is None:
+            raise ValueError("ask_knowledge requires an answer provider")
         filters = string_map(metadata) if metadata is not None else None
         plan = self._planner.plan(question, self._schema)
         if plan is None:
@@ -317,7 +338,7 @@ class RAG:
             result = self.reason(plan, metadata=filters, limit=limit)
         except KnowledgePlanError:
             return Answer(None, (), Context(()))
-        context = _context([], list(result.evidence), limit)
+        context = _knowledge_context(result, limit)
         return self._answer(question, context)
 
     def ask(
@@ -417,3 +438,20 @@ def _context(hits: list[SearchHit], paths: list[GraphPath], limit: int) -> Conte
             break
         passages.setdefault(hit.chunk.chunk_id, hit.chunk)
     return Context(tuple(passages.values()), tuple(accepted))
+
+
+def _knowledge_context(result: KnowledgeResult, limit: int) -> Context:
+    if result.required_legs == 1:
+        return _context([], list(result.evidence), limit)
+    proofs: defaultdict[str, dict[int, GraphPath]] = defaultdict(dict)
+    for leg, path in zip(result.evidence_legs, result.evidence, strict=True):
+        proofs[path.target].setdefault(leg, path)
+    selected: list[GraphPath] = []
+    known: set[str] = set()
+    for target in result.entities:
+        paths = tuple(proofs[target].values())
+        needed = {step.chunk.chunk_id for path in paths for step in path.steps}
+        if len(known | needed) <= limit:
+            selected.extend(paths)
+            known.update(needed)
+    return _context([], selected, limit)
