@@ -43,6 +43,10 @@ The supported Python interface is imported directly from `clickhouserag`.
     options:
       show_root_heading: true
 
+::: clickhouserag.SearchPlanner
+    options:
+      show_root_heading: true
+
 ::: clickhouserag.SearchQuery
     options:
       show_root_heading: true

@@ -521,3 +521,34 @@ def test_search_plan_fuses_passages_and_rechecks_complete_paths(rag: RAG) -> Non
         result = rag.retrieve_many(query, metadata={"team": "ops"}, limit=2)
     assert [item.source for item in result.passages] == ["ref:gateway"]
     assert not any(path.target == "vault" for path in result.paths)
+
+
+def test_planned_search_uses_original_question_and_keeps_scope(
+    database_client: Client, table: str
+) -> None:
+    class Planner(ToyProvider):
+        def plan_search(self, question, modes):
+            assert question == "How do I recover?"
+            assert modes == ("dense", "lexical", "hybrid")
+            return (SearchQuery("ERR-42", mode="lexical"),)
+
+        def generate(self, question: str, context: Context) -> GeneratedAnswer:
+            assert question == "How do I recover?"
+            assert len(context.passages) == 1
+            return GeneratedAnswer("Restart", [context.passages[0].chunk_id])
+
+    model = Planner()
+    rag = RAG(
+        database_client, model, table=table, dimensions=2, search_planner=model, generator=model
+    )
+    rag.initialize()
+    rag.index(Document("visible", "Recover from ERR-42 with restart.", "ref:ops", {"team": "ops"}))
+    rag.index(
+        Document("hidden", "Recover from ERR-42 otherwise.", "ref:hidden", {"team": "hidden"})
+    )
+    answer = rag.ask_planned("How do I recover?", metadata={"team": "ops"}, limit=1)
+    assert answer.text == "Restart"
+    assert [item.source for item in answer.citations] == ["ref:ops"]
+    with patch.object(model, "plan_search", return_value=()):
+        fallback = rag.ask_planned("How do I recover?", metadata={"team": "ops"}, limit=1)
+    assert fallback == answer
