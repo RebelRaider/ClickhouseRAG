@@ -45,3 +45,14 @@ over a corpus and questions where evidence is absent. Record corpus/model
 versions, mode, budgets and raw per-case results. Compare ranking and answer
 quality separately. Do not infer gains in retrieval from the generation model's
 ability to guess answers.
+
+## Work still in progress
+
+The initial implementation supports local directed traversal and a typed
+predicate chain. Next, add document lifecycle management so a replacement
+supersedes all of its former chunks together, including facts and shorter
+documents. Scope that change around the same revision invariants and add
+concurrency and retry tests. Compare graph query plans on graphs with
+high-degree nodes. Evaluate corpus-wide questions with separately generated
+community evidence and include a representative labelled corpus before
+promoting the framework release.

@@ -11,7 +11,7 @@ from clickhouserag._validation import _MAX_BATCH, identifier, integer, nonblank
 from clickhouserag.models import Chunk, SchemaError
 from clickhouserag.store import _SELECT_SETTINGS, ClickHouseStore, _scope
 
-_GRAPH_SCHEMA = "clickhouserag:graph:3"
+_GRAPH_SCHEMA = "clickhouserag:graph:4"
 _MAX_DEPTH = 4
 _MAX_FRONTIER = 128
 _MAX_FANOUT = 64
@@ -80,7 +80,9 @@ class GraphStore:
                 revision UInt64,
                 subject_type String,
                 object_type String,
-                entity_terms Array(String),
+                subject_terms Array(String),
+                object_terms Array(String),
+                entity_terms Array(String) MATERIALIZED arrayConcat(subject_terms, object_terms),
                 INDEX entity_idx(entity_terms) TYPE text(tokenizer = 'array')
             )
             ENGINE = ReplacingMergeTree
@@ -121,7 +123,7 @@ class GraphStore:
         self._ensure_schema()
         self._client.insert(
             self._qualified_table,
-            [(*row, terms(f"{row[1]} {row[3]}")) for row in rows],
+            [(*row, terms(row[1]), terms(row[3])) for row in rows],
             column_names=(
                 "namespace",
                 "subject",
@@ -131,7 +133,8 @@ class GraphStore:
                 "revision",
                 "subject_type",
                 "object_type",
-                "entity_terms",
+                "subject_terms",
+                "object_terms",
             ),
             settings={"async_insert": 0},
         )
@@ -208,7 +211,7 @@ class GraphStore:
         result = self._client.query(
             """
             WITH matches AS (
-                SELECT subject, object, chunk_id, revision
+                SELECT subject, object, subject_terms, object_terms, chunk_id, revision
                 FROM {database:Identifier}.{table:Identifier} FINAL
                 WHERE namespace = {namespace:String}
                     AND hasAnyTokens(entity_terms, {terms:Array(String)})
@@ -219,25 +222,23 @@ class GraphStore:
                     AND chunk_id IN (SELECT chunk_id FROM matches)
                     AND arrayAll(pair -> mapContains(metadata, pair.1)
                         AND metadata[pair.1] = pair.2, {filters:Array(Tuple(String, String))})
+            ), labels AS (
+                SELECT DISTINCT arrayJoin([(m.subject, m.subject_terms),
+                                           (m.object, m.object_terms)]) AS item
+                FROM matches AS m
+                INNER JOIN supporting AS p ON m.chunk_id = p.chunk_id AND m.revision = p.revision
             )
-            SELECT DISTINCT m.subject, m.object
-            FROM matches AS m
-            INNER JOIN supporting AS p ON m.chunk_id = p.chunk_id AND m.revision = p.revision
-            ORDER BY m.subject, m.object
-            LIMIT 4096
+            SELECT item.1 AS label
+            FROM labels
+            WHERE length(arrayIntersect(item.2, {terms:Array(String)})) > 0
+            ORDER BY length(arrayIntersect(item.2, {terms:Array(String)})) DESC,
+                length(item.2) ASC, label ASC
+            LIMIT {limit:UInt32}
             """,
             parameters={**params, **self._location, "terms": query_terms},
             settings=_SELECT_SETTINGS,
         )
-        tokens = set(query_terms)
-        labels = {label for row in result.result_rows for label in row}
-        scored = []
-        for label in labels:
-            label_terms = set(terms(label))
-            if matches := len(label_terms & tokens):
-                scored.append((label, matches, matches / len(label_terms)))
-        scored.sort(key=lambda item: (-item[1], -item[2], item[0]))
-        return [label for label, _, _ in scored[:limit]]
+        return [label for (label,) in result.result_rows]
 
     def _ensure_schema(self) -> None:
         if not self._validated:
