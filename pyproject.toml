@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling>=1.27"]
+requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [project]
 name = "clickhouserag"
-version = "1.0.0rc1"
+version = "1.0.0"
 description = "Filter-scoped retrieval for RAG applications backed by ClickHouse"
 readme = "README.md"
 requires-python = ">=3.11,<3.16"
@@ -12,7 +12,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["clickhouse", "rag", "hybrid-search", "vector-search", "retrieval"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.11",
@@ -26,6 +26,7 @@ classifiers = [
 dependencies = ["clickhouse-connect>=1.12,<2"]
 
 [project.urls]
+Documentation = "https://rebelraider.github.io/ClickhouseRAG/"
 Repository = "https://github.com/RebelRaider/ClickhouseRAG"
 Issues = "https://github.com/RebelRaider/ClickhouseRAG/issues"
 

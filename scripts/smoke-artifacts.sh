@@ -2,9 +2,13 @@
 set -euo pipefail
 
 repo="$(pwd)"
-output="$(mktemp -d)"
-trap 'rm -rf "$output"' EXIT
-uv build --out-dir "$output"
+if [[ $# == 0 ]]; then
+    output="$(mktemp -d)"
+    trap 'rm -rf "$output"' EXIT
+    uv build --out-dir "$output"
+else
+    output="$(cd "$1" && pwd)"
+fi
 uv run --locked twine check --strict "$output"/*
 for artifact in "$output"/*.whl "$output"/*.tar.gz; do
     (

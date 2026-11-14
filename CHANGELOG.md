@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.0
+
+- Stable Python API for database-backed dense, lexical and hybrid passage search.
+- Includes a migration from the legacy `RAGManager` and old table schema.
+- Verified CPython 3.11–3.15 and both ClickHouse 26.3 and 26.8 LTS lines.
+
 ## v1.0.0-rc.1
 
 - Added a locked CI matrix, real ClickHouse services, an artifact smoke test

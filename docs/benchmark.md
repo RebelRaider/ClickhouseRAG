@@ -1,6 +1,6 @@
 # Synthetic retrieval check
 
-Two deliberately contrasting labelled queries, 10,000 passages and 32-dimensional precomputed vectors. Single client and local ClickHouse 26.8.36.3 via Docker Desktop on macOS ARM64. One warm-up and 20 timed requests per strategy and query, without embedding latency.
+Two deliberately contrasting labelled queries, 10,000 passages and 32-dimensional precomputed vectors. Single client and local ClickHouse 26.8.36.3 via Docker Desktop on macOS ARM64 (Mac15,12, 8 logical CPUs, 16 GiB host memory). One warm-up and 20 timed requests per strategy and query, without embedding latency.
 
 | Query | Strategy | Recall@5 | MRR@5 | p50 (ms) | p95 (ms) |
 | --- | --- | ---: | ---: | ---: | ---: |

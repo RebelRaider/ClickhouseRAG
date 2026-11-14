@@ -33,7 +33,7 @@ def main() -> None:
             ],
             namespace="quickstart",
         )
-        for hit in store.search_vector([1.0, 0.0], namespace="quickstart", limit=1):
+        for hit in store.search_hybrid("replica", [1.0, 0.0], namespace="quickstart", limit=1):
             print(f"{hit.score:.3f}  {hit.chunk.text}  {hit.chunk.source}")
 
 
