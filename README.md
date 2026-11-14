@@ -4,8 +4,8 @@
 
 ClickHouse RAG is a Python framework for finding and citing evidence in
 ClickHouse. Use one collection for document updates, hybrid text and vector
-search, and relationship traversal. Supply your own models or use the
-built-in Ollama adapter.
+search, and relationship traversal. Compose local and hosted models for
+embeddings, graph extraction, planning, reranking and cited answers.
 
 - **Use your own embeddings.** Pass vectors directly or supply a Python provider.
 - **Keep the latest revision searchable.** The same identity and payload can be
@@ -43,6 +43,10 @@ uv run --locked python examples/basic_usage.py
 
 For document indexing, GraphRAG, KAG and evaluation, use the
 [framework walkthrough](https://rebelraider.github.io/ClickhouseRAG/framework/).
+The [model provider guide](https://rebelraider.github.io/ClickhouseRAG/providers/)
+shows how to mix backends. The optional
+[PostgreSQL add-on](https://rebelraider.github.io/ClickhouseRAG/postgres/)
+delivers document revisions to ClickHouse.
 
 See the [API reference](https://rebelraider.github.io/ClickhouseRAG/api/), [operations guide](https://rebelraider.github.io/ClickhouseRAG/operations/),
 [benchmark](https://rebelraider.github.io/ClickhouseRAG/benchmark/) and [design](https://rebelraider.github.io/ClickhouseRAG/maintainer/design/).
