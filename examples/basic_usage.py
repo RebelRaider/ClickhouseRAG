@@ -16,7 +16,7 @@ def main() -> None:
         autogenerate_session_id=False,
     ) as client:
         store = ClickHouseStore(
-            client, table="chrag_quickstart", embedding_model="toy-v1", dimensions=2
+            client, table="chrag_quickstart_v1", embedding_model="toy-v1", dimensions=2
         )
         store.initialize()
         store.insert(

@@ -6,6 +6,8 @@ from typing import Any
 
 from clickhouse_connect.driver.client import Client
 
+from clickhouserag._lexical import _MAX_QUERY_TERMS, terms
+from clickhouserag._ranking import reciprocal_rank_fusion
 from clickhouserag._validation import (
     _MAX_BATCH,
     _MAX_DIMENSIONS,
@@ -28,8 +30,13 @@ _INSERT_COLUMNS = (
     "revision",
     "metadata",
     "embedding",
+    "lexical_terms",
 )
-_SELECT_SETTINGS = {"optimize_move_to_prewhere_if_final": 0}
+_SELECT_SETTINGS = {
+    "optimize_move_to_prewhere_if_final": 0,
+    "use_skip_indexes_if_final_exact_mode": 1,
+    "enable_shared_storage_snapshot_in_query": 1,
+}
 
 
 class ClickHouseStore:
@@ -50,8 +57,9 @@ class ClickHouseStore:
         self._table = f"{identifier(database)}.{identifier(table)}"
         self._location = {"database": database, "table": table}
         self._dimensions = dimensions
+        self._embedding_model = embedding_model
         self._manifest = "clickhouserag:" + json.dumps(
-            {"schema": 1, "model": embedding_model, "dimensions": dimensions},
+            {"schema": 2, "model": embedding_model, "dimensions": dimensions},
             sort_keys=True,
             separators=(",", ":"),
         )
@@ -61,6 +69,11 @@ class ClickHouseStore:
     def dimensions(self) -> int:
         """Expected number of components in each vector."""
         return self._dimensions
+
+    @property
+    def embedding_model(self) -> str:
+        """Identifier of the embedding model associated with this table."""
+        return self._embedding_model
 
     def initialize(self) -> None:
         """Create an empty table if absent, then validate its schema identity."""
@@ -77,6 +90,8 @@ class ClickHouseStore:
                 revision UInt64,
                 metadata Map(String, String),
                 embedding Array(Float32),
+                lexical_terms Array(String),
+                INDEX lexical_idx(lexical_terms) TYPE text(tokenizer = 'array'),
                 CONSTRAINT embedding_dimensions CHECK length(embedding) = %(dimensions)s
             )
             ENGINE = ReplacingMergeTree(revision)
@@ -131,6 +146,7 @@ class ClickHouseStore:
                     chunk.revision,
                     metadata,
                     unit_vector(item.embedding, self.dimensions),
+                    terms(chunk.text),
                 )
             )
         if not rows:
@@ -170,6 +186,103 @@ class ClickHouseStore:
             parameters,
         )
 
+    def search_lexical(
+        self,
+        query: str,
+        *,
+        namespace: str = "default",
+        metadata: Mapping[str, str] | None = None,
+        limit: int = 10,
+    ) -> list[SearchHit]:
+        """Rank matching passages by distinct query token coverage."""
+        parameters = _scope(namespace, metadata, limit)
+        query_terms = _query_terms(query)
+        if not query_terms:
+            return []
+        parameters.update(self._location, terms=query_terms)
+        return self._search(
+            """
+            SELECT chunk_id, document_id, text, source, revision, metadata,
+                length(arrayIntersect(lexical_terms, {terms:Array(String)})) AS score
+            FROM {database:Identifier}.{table:Identifier} FINAL
+            WHERE namespace = {namespace:String}
+                AND arrayAll(pair -> mapContains(metadata, pair.1)
+                    AND metadata[pair.1] = pair.2, {filters:Array(Tuple(String, String))})
+                AND hasAnyTokens(lexical_terms, {terms:Array(String)})
+            ORDER BY score DESC, chunk_id ASC
+            LIMIT {limit:UInt32}
+            """,
+            parameters,
+        )
+
+    def search_hybrid(
+        self,
+        query: str,
+        embedding: Sequence[float],
+        *,
+        namespace: str = "default",
+        metadata: Mapping[str, str] | None = None,
+        limit: int = 10,
+        candidates: int | None = None,
+    ) -> list[SearchHit]:
+        """Fuse independently ranked vector and lexical candidates."""
+        integer(limit, "limit", _MAX_LIMIT)
+        if candidates is None:
+            candidates = min(limit * 4, _MAX_LIMIT)
+        integer(candidates, "candidates", _MAX_LIMIT)
+        if candidates < limit:
+            raise ValueError("candidates must be at least limit")
+        parameters = _scope(namespace, metadata, candidates)
+        query_terms = _query_terms(query)
+        if not query_terms:
+            dense = self.search_vector(
+                embedding, namespace=namespace, metadata=metadata, limit=limit
+            )
+            return reciprocal_rank_fusion(dense, [], limit)
+        parameters.update(
+            self._location, terms=query_terms, embedding=unit_vector(embedding, self.dimensions)
+        )
+        self._ensure_schema()
+        result = self._client.query(
+            """
+            WITH scoped AS (
+                SELECT chunk_id, document_id, text, source, revision, metadata,
+                    embedding, lexical_terms
+                FROM {database:Identifier}.{table:Identifier} FINAL
+                WHERE namespace = {namespace:String}
+                    AND arrayAll(pair -> mapContains(metadata, pair.1)
+                        AND metadata[pair.1] = pair.2, {filters:Array(Tuple(String, String))})
+            ),
+            dense AS (
+                SELECT chunk_id, document_id, text, source, revision, metadata,
+                    1 - cosineDistance(embedding, {embedding:Array(Float32)}) AS score, 0 AS lane
+                FROM scoped
+                ORDER BY score DESC, chunk_id ASC
+                LIMIT {limit:UInt32}
+            ),
+            lexical AS (
+                SELECT chunk_id, document_id, text, source, revision, metadata,
+                    toFloat64(length(arrayIntersect(lexical_terms, {terms:Array(String)})))
+                        AS score, 1 AS lane
+                FROM scoped
+                WHERE hasAnyTokens(lexical_terms, {terms:Array(String)})
+                ORDER BY score DESC, chunk_id ASC
+                LIMIT {limit:UInt32}
+            )
+            SELECT * FROM dense
+            UNION ALL
+            SELECT * FROM lexical
+            """,
+            parameters=parameters,
+            settings=_SELECT_SETTINGS,
+        )
+        lanes: tuple[list[SearchHit], list[SearchHit]] = ([], [])
+        for *row, lane in result.result_rows:
+            lanes[lane].append(_hit(row))
+        for hits in lanes:
+            hits.sort(key=lambda hit: (-hit.score, hit.chunk.chunk_id))
+        return reciprocal_rank_fusion(*lanes, limit)
+
     def _ensure_schema(self) -> None:
         if not self._validated:
             self.validate_schema()
@@ -177,10 +290,21 @@ class ClickHouseStore:
     def _search(self, query: str, parameters: dict[str, Any]) -> list[SearchHit]:
         self._ensure_schema()
         rows = self._client.query(query, parameters=parameters, settings=_SELECT_SETTINGS)
-        return [
-            SearchHit(Chunk(chunk_id, document_id, text, source, revision, metadata), float(score))
-            for chunk_id, document_id, text, source, revision, metadata, score in rows.result_rows
-        ]
+        return [_hit(row) for row in rows.result_rows]
+
+
+def _hit(row: Sequence[Any]) -> SearchHit:
+    chunk_id, document_id, text, source, revision, metadata, score = row
+    return SearchHit(Chunk(chunk_id, document_id, text, source, revision, metadata), float(score))
+
+
+def _query_terms(query: str) -> list[str]:
+    if not isinstance(query, str):
+        raise ValueError("query must be a string")
+    result = terms(query)
+    if len(result) > _MAX_QUERY_TERMS:
+        raise ValueError(f"query must have at most {_MAX_QUERY_TERMS} distinct tokens")
+    return result
 
 
 def _scope(namespace: str, metadata: Mapping[str, str] | None, limit: int) -> dict[str, Any]:

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clickhouserag"
-version = "1.0.0a1"
+version = "1.0.0b1"
 description = "Filter-scoped retrieval for RAG applications backed by ClickHouse"
 readme = "README.md"
 requires-python = ">=3.11,<3.16"
@@ -12,7 +12,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["clickhouse", "rag", "hybrid-search", "vector-search", "retrieval"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.11",
