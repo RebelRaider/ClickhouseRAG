@@ -37,8 +37,11 @@ class Retriever:
     def index(self, chunks: Sequence[Chunk], *, namespace: str = "default") -> int:
         """Embed and insert a batch of passages."""
         nonblank(namespace, "namespace")
+        return self._store.insert(self._embed(chunks), namespace=namespace)
+
+    def _embed(self, chunks: Sequence[Chunk]) -> list[EmbeddedChunk]:
         if not chunks:
-            return 0
+            return []
         if len(chunks) > _MAX_BATCH:
             raise ValueError(f"index accepts at most {_MAX_BATCH} chunks per batch")
         for chunk in chunks:
@@ -48,10 +51,7 @@ class Retriever:
         vectors = self._provider.embed_documents([chunk.text for chunk in chunks])
         if len(vectors) != len(chunks):
             raise ValueError("embedding provider returned the wrong number of document vectors")
-        return self._store.insert(
-            (EmbeddedChunk(chunk, vector) for chunk, vector in zip(chunks, vectors, strict=True)),
-            namespace=namespace,
-        )
+        return [EmbeddedChunk(chunk, vector) for chunk, vector in zip(chunks, vectors, strict=True)]
 
     def search(
         self,

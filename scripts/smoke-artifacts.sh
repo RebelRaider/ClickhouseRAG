@@ -14,5 +14,6 @@ for artifact in "$output"/*.whl "$output"/*.tar.gz; do
     (
         cd "$output"
         uv run --no-project --isolated --python 3.14 --with "$artifact" python "$repo/examples/basic_usage.py"
+        uv run --no-project --isolated --python 3.14 --with "$artifact" python "$repo/examples/graph_rag.py"
     )
 done

@@ -37,6 +37,7 @@ _SELECT_SETTINGS = {
     "use_skip_indexes_if_final_exact_mode": 1,
     "enable_shared_storage_snapshot_in_query": 1,
 }
+_PassageRow = tuple[str, str, str, str, str, int, dict[str, str], list[float], list[str]]
 
 
 class ClickHouseStore:
@@ -125,6 +126,9 @@ class ClickHouseStore:
         Repeat the same payload at the same revision to retry a failed write. Use
         a strictly greater revision for replacements of a given namespace/chunk ID.
         """
+        return self._insert_rows(self._prepare_rows(chunks, namespace))
+
+    def _prepare_rows(self, chunks: Iterable[EmbeddedChunk], namespace: str) -> list[_PassageRow]:
         nonblank(namespace, "namespace")
         rows = []
         ids = set()
@@ -149,6 +153,12 @@ class ClickHouseStore:
                     terms(chunk.text),
                 )
             )
+        return rows
+
+    def _insert_rows(
+        self,
+        rows: list[_PassageRow],
+    ) -> int:
         if not rows:
             return 0
         self._ensure_schema()

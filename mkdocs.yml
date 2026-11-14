@@ -11,12 +11,14 @@ extra_css:
 nav:
   - Home: index.md
   - Quickstart: quickstart.md
+  - Framework quickstart: framework.md
   - API reference: api.md
   - Operations: operations.md
   - Upgrade from 0.x: migration.md
   - Retrieval benchmark: benchmark.md
   - Maintainers:
       - Design: maintainer/design.md
+      - Framework design: maintainer/framework.md
       - Brand assets: maintainer/brand.md
       - Releases: maintainer/releases.md
 plugins:
