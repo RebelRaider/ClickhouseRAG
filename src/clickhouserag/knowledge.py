@@ -26,6 +26,10 @@ class KnowledgeQuery:
     predicates: tuple[str, ...]
 
 
+class KnowledgePlanError(ValueError):
+    """A predicate chain cannot be executed against the declared schema."""
+
+
 class KnowledgePlanner(Protocol):
     """Translate a question into a schema-aware plan or decline to plan it."""
 
@@ -96,16 +100,16 @@ class Knowledge:
 
     def _validate_chain(self, query: KnowledgeQuery) -> tuple[tuple[str, ...], tuple[str, ...]]:
         if not 1 <= len(query.predicates) <= 4:
-            raise ValueError("knowledge queries require one to four predicates")
+            raise KnowledgePlanError("knowledge queries require one to four predicates")
         entity_type = canonical_entity(query.entity_type)
         types = [entity_type]
         predicates = tuple(map(canonical_entity, query.predicates))
         for name in predicates:
             if name not in self._schema:
-                raise ValueError(f"unknown predicate {name!r}")
+                raise KnowledgePlanError(f"unknown predicate {name!r}")
             source, target = self._schema[name]
             if source != entity_type:
-                raise ValueError(f"predicate {name!r} does not accept type {entity_type!r}")
+                raise KnowledgePlanError(f"predicate {name!r} does not accept type {entity_type!r}")
             entity_type = target
             types.append(target)
         return predicates, tuple(types)

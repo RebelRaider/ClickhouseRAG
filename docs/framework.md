@@ -50,6 +50,8 @@ It does not judge whether the generated claim entails the evidence.
   traversal bounds. Pass a `KnowledgePlanner` and call `ask_knowledge(question)`
   to translate a natural-language question to a typed plan before reasoning.
   Plans are validated against the schema and executed with bound parameters.
+  An invalid chain produces an abstention in `ask_knowledge`. Use `reason`
+  with an explicit plan when the application already knows the chain.
   Corpus-wide community summaries are described in the
   [framework design](maintainer/framework.md).
 
@@ -98,7 +100,7 @@ with clickhouse_connect.get_client(
     rag.initialize()
     rag.index(Document("gateway", "Gateway calls Ledger.", "https://example.org/gateway"))
     rag.index(Document("ledger", "Ledger writes Vault.", "https://example.org/ledger"))
-    answer = rag.ask_knowledge("Which database does Gateway write to through Ledger?")
+    answer = rag.ask_knowledge("What database is written to by a service that Gateway calls?")
     print(answer.text, [chunk.source for chunk in answer.citations])
 ```
 

@@ -4,7 +4,7 @@ import os
 
 import clickhouse_connect
 
-from clickhouserag import Document, Predicate
+from clickhouserag import Document, KnowledgeQuery, Predicate
 from clickhouserag.ollama import Ollama
 
 
@@ -34,10 +34,12 @@ def main() -> None:
         rag.index(Document("gateway", "Gateway calls Ledger.", "https://example.org/gateway"))
         rag.index(Document("ledger", "Ledger writes Vault.", "https://example.org/ledger"))
 
-        question = "Which database does Gateway write to through Ledger?"
+        question = "What database is written to by a service that Gateway calls?"
         for ask in (rag.ask, rag.ask_knowledge):
             answer = ask(question)
-            print(answer.text, [item.source for item in answer.citations])
+            print(ask.__name__, answer.text, [item.source for item in answer.citations])
+        planned = rag.reason(KnowledgeQuery("Gateway", "service", ("calls", "writes")))
+        print("explicit plan", planned.entities)
 
 
 if __name__ == "__main__":

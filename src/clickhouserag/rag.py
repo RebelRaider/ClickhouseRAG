@@ -12,6 +12,7 @@ from clickhouserag._validation import _MAX_BATCH, _MAX_LIMIT, integer, nonblank,
 from clickhouserag.graph import GraphPath, GraphStore, Relation
 from clickhouserag.knowledge import (
     Knowledge,
+    KnowledgePlanError,
     KnowledgePlanner,
     KnowledgeQuery,
     KnowledgeResult,
@@ -229,7 +230,10 @@ class RAG:
         plan = self._planner.plan(question, self._schema)
         if plan is None:
             return Answer(None, (), Context(()))
-        result = self.reason(plan, metadata=filters, limit=limit)
+        try:
+            result = self.reason(plan, metadata=filters, limit=limit)
+        except KnowledgePlanError:
+            return Answer(None, (), Context(()))
         context = _context([], list(result.evidence), limit)
         return self._answer(question, context)
 

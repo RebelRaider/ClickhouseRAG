@@ -67,3 +67,10 @@ Graph, mixed and explicitly planned KAG returned both supporting passages.
 The example reports metrics by category and makes the synthetic setup
 reproducible. Compare a representative corpus before using these results
 to choose a mode for production.
+
+A separate local smoke test used Ollama 0.40.16, EmbeddingGemma (768 output
+dimensions), Qwen 2.5 1.5B, and ClickHouse 26.3.62.3. The example returned
+`Vault` with both sources in mixed and model-planned KAG. Rephrasing the
+question to mention the intermediate service explicitly caused that model to
+produce an invalid plan and abstain. Treat the example as an end-to-end
+integration check. The planner still needs paraphrase and ambiguity evaluation.

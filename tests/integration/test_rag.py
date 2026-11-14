@@ -39,6 +39,8 @@ class ToyProvider:
         ]
 
     def plan(self, question: str, schema: tuple[Predicate, ...]) -> KnowledgeQuery | None:
+        if question == "Invalid":
+            return KnowledgeQuery("gateway", "service", ("missing",))
         return (
             KnowledgeQuery("gateway", "service", ("calls", "writes"))
             if "Gateway" in question
@@ -94,6 +96,7 @@ def test_document_to_cited_answer(rag: RAG) -> None:
     assert answer.text == "vault"
     assert rag.ask_knowledge(query, limit=2).citations == answer.citations
     assert rag.ask_knowledge("Who owns Jupiter?").text is None
+    assert rag.ask_knowledge("Invalid").text is None
     assert [chunk.source for chunk in answer.citations] == ["ref:gateway", "ref:ledger"]
 
     empty = rag.ask(query, mode="graph", metadata={"team": "other"})

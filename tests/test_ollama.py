@@ -24,7 +24,7 @@ def test_provider_implements_structured_requests_and_citations() -> None:
             _chat(
                 {"relations": [{"subject": "Gateway", "predicate": "calls", "object": "Ledger"}]}
             ),
-            _chat({"entity": "Gateway", "entity_type": "service", "predicates": ["calls"]}),
+            _chat({"entity": "Gateway", "predicates": ["calls"]}),
             _chat({"answer": "Ledger", "citations": ["1"]}),
         ]
         assert adapter.embed_query("query") == [1, 0]
