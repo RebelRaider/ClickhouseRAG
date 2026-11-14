@@ -93,3 +93,26 @@ an explicit mode. The [per-case report on GitHub](https://github.com/RebelRaider
 records the underlying metrics and failures. Each question used a small,
 preselected evidence collection. Compare against your own workload before
 using these results to choose a retrieval mode or size a deployment.
+
+## Cost of expanding a graph with a shared hub
+
+The fixture gives each document 100 relationship assertions. A common hub
+connects the topics into one component and each topic connects to 99 leaves.
+It uses a two-dimensional constant embedding. The measurements below used
+ClickHouse 26.8.36.3 in local Docker on Apple Silicon, one warm-up and 20
+requests per mode, with a ten-passage budget and no language model calls.
+
+| Facts | Hybrid p95 | Graph p95 | Mixed p95 | Global p95 |
+| ---: | ---: | ---: | ---: | ---: |
+| 1,000 | 12.53 ms | 73.07 ms | 84.14 ms | 20.17 ms |
+| 10,000 | 15.82 ms | 82.54 ms | 98.74 ms | 41.49 ms |
+
+The graph mode reached its 40-path candidate limit with eight supporting
+passages at both sizes. Global returned one component at both sizes and
+reported truncation at 10,000 facts with its default 5,000-fact budget.
+These timings describe a skewed fixture with 10 or 100 passages. This is
+a graph cost check; service latency and ranking need a corpus of your own.
+
+```sh
+uv run --locked python benchmarks/graph_scale.py
+```
