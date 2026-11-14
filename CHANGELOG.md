@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.3.0 (2026-11-14)
+
+- Add Amazon Bedrock Converse and Titan V2 and Google Cloud publisher model
+  adapters with application-owned cloud credentials.
+- Combine scoped searches through `retrieve_many` or `ask_many`. For
+  model-selected search terms and modes, configure a separate search planner
+  and use `ask_planned`.
+- Add a runnable example that uses Ollama for search planning and llama.cpp
+  for embeddings and cited generation over ClickHouse.
+
+
 ## v1.3.0-rc.1 (2026-11-14)
 
 ### Documentation
