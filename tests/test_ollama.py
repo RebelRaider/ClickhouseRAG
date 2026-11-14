@@ -13,7 +13,9 @@ def _chat(payload: dict) -> bytes:
 
 def test_provider_implements_structured_requests_and_citations() -> None:
     schema = (Predicate("calls", "service", "service"),)
-    adapter = Ollama(embedding_model="embed", chat_model="chat", dimensions=2, schema=schema)
+    adapter = Ollama(
+        embedding_model="embed", chat_model="chat", dimensions=2, schema=schema, max_relations=3
+    )
     passage = Chunk("first", "doc", "Gateway calls Ledger.", "source")
     with patch("clickhouserag.ollama.http.client.HTTPConnection") as factory:
         connection = factory.return_value
@@ -40,6 +42,8 @@ def test_provider_implements_structured_requests_and_citations() -> None:
         assert answer.citation_ids == ["first"]
         methods = [(call.args[0], call.args[1]) for call in connection.request.call_args_list]
         assert methods == [("POST", "/api/embed"), *(("POST", "/api/chat"),) * 3]
+        extractor_request = json.loads(connection.request.call_args_list[1].args[2])
+        assert extractor_request["format"]["properties"]["relations"]["maxItems"] == 3
         planner_request = json.loads(connection.request.call_args_list[2].args[2])
         assert planner_request["format"]["properties"]["predicates"]["items"]["enum"] == ["calls"]
         request = json.loads(connection.request.call_args.args[2])
@@ -48,6 +52,17 @@ def test_provider_implements_structured_requests_and_citations() -> None:
         assert json.loads(request["messages"][1]["content"])["evidence"] == [
             {"id": "1", "text": passage.text}
         ]
+
+
+def test_provider_rejects_extractions_beyond_the_requested_budget() -> None:
+    adapter = Ollama(embedding_model="embed", chat_model="chat", dimensions=2, max_relations=1)
+    fact = {"subject": "Gateway", "predicate": "calls", "object": "Ledger"}
+    passage = Chunk("first", "doc", "Gateway calls Ledger.", "source")
+    with (
+        patch.object(adapter, "_structured", return_value={"relations": [fact, fact]}),
+        pytest.raises(ModelResponseError, match="invalid relationship list"),
+    ):
+        adapter.extract(passage)
 
 
 def test_provider_rejects_unexpected_citations_and_http_failures() -> None:

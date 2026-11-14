@@ -1,8 +1,9 @@
 # Framework quickstart
 
 The framework API uses one ClickHouse HTTP client and provisions one managed
-table for document revisions, passages, and their relationships. The same collection and metadata filters apply to text search, graph
-expansion, and reasoning.
+table for document revisions, passages, and their relationships. The same
+collection and metadata filters apply to text search, graph expansion and
+reasoning.
 
 Start a compatible ClickHouse server as in the [quickstart](quickstart.md).
 In a checkout of this version, run the offline example. It uses deterministic
@@ -145,4 +146,7 @@ The adapter uses the configured Ollama origin directly and sends input text
 to it. Use `embedding_version` to distinguish model revisions if reusing a tag.
 Change the table when moving to a different embedding space. The local
 offline example tests the RAG pipeline independently of Ollama. Model output
-quality depends on the schema, corpus and selected models.
+quality depends on the schema, corpus and selected models. The adapter requests
+up to twelve relationships per passage by default. Set `max_relations` to
+adjust extraction work for the density of your passages. When the model fails
+to complete a response, the document stays at its previous published revision.
