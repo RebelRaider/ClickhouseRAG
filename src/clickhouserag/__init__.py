@@ -23,6 +23,7 @@ from clickhouserag.rag import (
     ExtractedRelation,
     GeneratedAnswer,
     RelationExtractor,
+    Reranker,
 )
 from clickhouserag.retriever import EmbeddingProvider, Retriever
 from clickhouserag.store import ClickHouseStore
@@ -57,6 +58,7 @@ __all__ = [
     "Predicate",
     "Relation",
     "RelationExtractor",
+    "Reranker",
     "Retriever",
     "SchemaError",
     "SearchHit",

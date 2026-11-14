@@ -69,4 +69,8 @@ The supported Python interface is imported directly from `clickhouserag`.
     options:
       show_root_heading: true
 
+::: clickhouserag.Reranker
+    options:
+      show_root_heading: true
+
 See the [provider guide](providers.md) for the concrete HTTP adapters.

@@ -66,6 +66,15 @@ class JsonEndpoint:
     def post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         return _json_object(self._send(path, body))
 
+    def post_array(self, path: str, body: dict[str, Any]) -> list[Any]:
+        try:
+            result = json.loads(self._send(path, body))
+        except (ValueError, UnicodeError) as exc:
+            raise ModelResponseError("Model did not return valid JSON") from exc
+        if not isinstance(result, list):
+            raise ModelResponseError("Model response must be a JSON array")
+        return result
+
     def _send(self, path: str, body: dict[str, Any]) -> bytes:
         connection_type = (
             http.client.HTTPSConnection if self._secure else http.client.HTTPConnection

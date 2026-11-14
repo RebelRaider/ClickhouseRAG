@@ -91,6 +91,23 @@ the same ClickHouse collection. It creates and drops a temporary demo table.
   the current model operation. ClickHouse keeps the previously published
   revision if indexing fails before publication.
 
+## Rerank search candidates
+
+Pass `reranker=` to `RAG` with `CohereReranker`, `VoyageReranker`,
+`TEIReranker`, or your own `Reranker`. Set `rerank_candidates` to the
+number of scoped candidates to request from ClickHouse before taking the
+final `limit`. The default candidate count is 32, and the actual request
+uses at least the final limit. Check the chosen endpoint's batch limit.
+In mixed mode, complete graph paths keep priority and reranking orders
+the text candidates that can fill the remaining budget. Global and KAG
+queries use their existing group and proof selection.
+
+The reranker sees only candidates that passed namespace and metadata
+filters. Built-in HTTP rerankers send the query and passage text. They
+return input indices. ClickHouse remains the source of passage text,
+identity and provenance. Revisions are checked again after reranking so
+that a document removed during the model call cannot appear in the result.
+
 ## Drivers and capabilities
 
 Use [OpenAI's structured output guide](https://developers.openai.com/api/docs/guides/structured-outputs)

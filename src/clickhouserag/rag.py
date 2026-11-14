@@ -88,6 +88,14 @@ class AnswerProvider(Protocol):
         ...
 
 
+class Reranker(Protocol):
+    """Return a permutation of the ClickHouse candidates, best match first."""
+
+    def rank(self, query: str, passages: Sequence[Chunk]) -> Sequence[int]:
+        """Return only indices into the input sequence, with each index used once."""
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class Answer:
     """A generated answer and its verified references, or a no-evidence result."""
@@ -122,11 +130,14 @@ class RAG:
         graph: bool = False,
         schema: tuple[Predicate, ...] | None = None,
         planner: KnowledgePlanner | None = None,
+        reranker: Reranker | None = None,
+        rerank_candidates: int = 32,
         chunk_size: int = 1600,
         chunk_overlap: int = 160,
     ) -> None:
         nonblank(namespace, "namespace")
         integer(chunk_size, "chunk_size", 100_000)
+        integer(rerank_candidates, "rerank_candidates", _MAX_LIMIT)
         if type(chunk_overlap) is not int or not 0 <= chunk_overlap < chunk_size:
             raise ValueError("chunk_overlap must be a nonnegative integer less than chunk_size")
         self.passages = DocumentStore(
@@ -152,6 +163,8 @@ class RAG:
         self._planner = planner
         self._extractor = extractor
         self._generator = generator
+        self._reranker = reranker
+        self._rerank_candidates = rerank_candidates
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
 
@@ -246,16 +259,30 @@ class RAG:
             raise ValueError("graph mode requires graph configuration")
         filters = string_map(metadata) if metadata is not None else None
         scope: _Scope = {"namespace": self._namespace, "metadata": filters}
+        candidate_limit = (
+            max(limit, self._rerank_candidates) if self._reranker is not None else limit
+        )
         hits: list[SearchHit] = []
         if mode == "lexical":
-            hits = self.passages.search_lexical(query, limit=limit, **scope)
+            hits = self.passages.search_lexical(query, limit=candidate_limit, **scope)
         elif mode != "graph":
-            hits = self._retriever.search(query, limit=limit, hybrid=mode != "dense", **scope)
+            hits = self._retriever.search(
+                query, limit=candidate_limit, hybrid=mode != "dense", **scope
+            )
         paths = []
         if self.graph is not None and mode in ("graph", "mixed"):
             selected = self.graph.seed_entities(query, **scope) if seeds is None else seeds
             paths = self.graph.expand(selected, depth=depth, limit=min(limit * 4, 1000), **scope)
             hits, paths = self._visible_evidence(hits, paths)
+        if self._reranker is not None and len(hits) > 1:
+            order = tuple(self._reranker.rank(query, tuple(hit.chunk for hit in hits)))
+            if (
+                len(order) != len(hits)
+                or any(type(index) is not int for index in order)
+                or set(order) != set(range(len(hits)))
+            ):
+                raise ValueError("reranker must return a permutation of the candidate indices")
+            hits, paths = self._visible_evidence([hits[index] for index in order], paths)
         return _context(hits, paths, limit)
 
     def overview(

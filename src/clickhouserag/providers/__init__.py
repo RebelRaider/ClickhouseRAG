@@ -11,12 +11,14 @@ from clickhouserag.providers.openai_compatible import (
     OpenAICompatibleEmbeddings,
     OpenAICompatibleResponses,
 )
+from clickhouserag.providers.rerank import CohereReranker, TEIReranker, VoyageReranker
 from clickhouserag.providers.voyage import VoyageEmbeddings
 
 __all__ = [
     "AnthropicMessages",
     "CohereChat",
     "CohereEmbeddings",
+    "CohereReranker",
     "GeminiChat",
     "GeminiEmbeddings",
     "JsonModel",
@@ -29,5 +31,7 @@ __all__ = [
     "OpenAICompatibleEmbeddings",
     "OpenAICompatibleResponses",
     "StructuredLLM",
+    "TEIReranker",
     "VoyageEmbeddings",
+    "VoyageReranker",
 ]
