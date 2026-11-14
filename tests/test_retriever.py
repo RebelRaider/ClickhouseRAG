@@ -26,7 +26,7 @@ def test_provider_routes_passages_and_query() -> None:
     retriever = Retriever(store, ToyProvider())
     chunk = Chunk("1", "doc", "Text", "source")
     assert retriever.index([chunk], namespace="collection") == 1
-    inserted = next(store.insert.call_args.args[0])
+    inserted = next(iter(store.insert.call_args.args[0]))
     assert inserted.chunk == chunk
     assert inserted.embedding == [1, 0]
     assert store.insert.call_args.kwargs == {"namespace": "collection"}

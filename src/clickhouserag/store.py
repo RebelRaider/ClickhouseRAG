@@ -37,6 +37,37 @@ _SELECT_SETTINGS = {
     "use_skip_indexes_if_final_exact_mode": 1,
     "enable_shared_storage_snapshot_in_query": 1,
 }
+_TABLE_SOURCE = "{database:Identifier}.{table:Identifier} FINAL"
+_PassageRow = tuple[str, str, str, str, str, int, dict[str, str], list[float], list[str]]
+_HYBRID_SQL = """
+WITH scoped AS (
+    SELECT chunk_id, document_id, text, source, revision, metadata,
+        embedding, lexical_terms
+    FROM @passages@
+    WHERE namespace = {namespace:String}
+        AND arrayAll(pair -> mapContains(metadata, pair.1)
+            AND metadata[pair.1] = pair.2, {filters:Array(Tuple(String, String))})
+),
+dense AS (
+    SELECT chunk_id, document_id, text, source, revision, metadata,
+        1 - cosineDistance(embedding, {embedding:Array(Float32)}) AS score, 0 AS lane
+    FROM scoped
+    ORDER BY score DESC, chunk_id ASC
+    LIMIT {limit:UInt32}
+),
+lexical AS (
+    SELECT chunk_id, document_id, text, source, revision, metadata,
+        toFloat64(length(arrayIntersect(lexical_terms, {terms:Array(String)})))
+            AS score, 1 AS lane
+    FROM scoped
+    WHERE hasAnyTokens(lexical_terms, {terms:Array(String)})
+    ORDER BY score DESC, chunk_id ASC
+    LIMIT {limit:UInt32}
+)
+SELECT * FROM dense
+UNION ALL
+SELECT * FROM lexical
+"""
 
 
 class ClickHouseStore:
@@ -64,6 +95,8 @@ class ClickHouseStore:
             separators=(",", ":"),
         )
         self._validated = False
+
+    _passage_source = _TABLE_SOURCE
 
     @property
     def dimensions(self) -> int:
@@ -125,6 +158,9 @@ class ClickHouseStore:
         Repeat the same payload at the same revision to retry a failed write. Use
         a strictly greater revision for replacements of a given namespace/chunk ID.
         """
+        return self._insert_rows(self._prepare_rows(chunks, namespace))
+
+    def _prepare_rows(self, chunks: Iterable[EmbeddedChunk], namespace: str) -> list[_PassageRow]:
         nonblank(namespace, "namespace")
         rows = []
         ids = set()
@@ -149,6 +185,12 @@ class ClickHouseStore:
                     terms(chunk.text),
                 )
             )
+        return rows
+
+    def _insert_rows(
+        self,
+        rows: list[_PassageRow],
+    ) -> int:
         if not rows:
             return 0
         self._ensure_schema()
@@ -176,7 +218,7 @@ class ClickHouseStore:
             """
             SELECT chunk_id, document_id, text, source, revision, metadata,
                 1 - cosineDistance(embedding, {embedding:Array(Float32)}) AS score
-            FROM {database:Identifier}.{table:Identifier} FINAL
+            FROM @passages@
             WHERE namespace = {namespace:String}
                 AND arrayAll(pair -> mapContains(metadata, pair.1)
                     AND metadata[pair.1] = pair.2, {filters:Array(Tuple(String, String))})
@@ -204,7 +246,7 @@ class ClickHouseStore:
             """
             SELECT chunk_id, document_id, text, source, revision, metadata,
                 length(arrayIntersect(lexical_terms, {terms:Array(String)})) AS score
-            FROM {database:Identifier}.{table:Identifier} FINAL
+            FROM @passages@
             WHERE namespace = {namespace:String}
                 AND arrayAll(pair -> mapContains(metadata, pair.1)
                     AND metadata[pair.1] = pair.2, {filters:Array(Tuple(String, String))})
@@ -244,35 +286,7 @@ class ClickHouseStore:
         )
         self._ensure_schema()
         result = self._client.query(
-            """
-            WITH scoped AS (
-                SELECT chunk_id, document_id, text, source, revision, metadata,
-                    embedding, lexical_terms
-                FROM {database:Identifier}.{table:Identifier} FINAL
-                WHERE namespace = {namespace:String}
-                    AND arrayAll(pair -> mapContains(metadata, pair.1)
-                        AND metadata[pair.1] = pair.2, {filters:Array(Tuple(String, String))})
-            ),
-            dense AS (
-                SELECT chunk_id, document_id, text, source, revision, metadata,
-                    1 - cosineDistance(embedding, {embedding:Array(Float32)}) AS score, 0 AS lane
-                FROM scoped
-                ORDER BY score DESC, chunk_id ASC
-                LIMIT {limit:UInt32}
-            ),
-            lexical AS (
-                SELECT chunk_id, document_id, text, source, revision, metadata,
-                    toFloat64(length(arrayIntersect(lexical_terms, {terms:Array(String)})))
-                        AS score, 1 AS lane
-                FROM scoped
-                WHERE hasAnyTokens(lexical_terms, {terms:Array(String)})
-                ORDER BY score DESC, chunk_id ASC
-                LIMIT {limit:UInt32}
-            )
-            SELECT * FROM dense
-            UNION ALL
-            SELECT * FROM lexical
-            """,
+            _HYBRID_SQL.replace("@passages@", self._passage_source),
             parameters=parameters,
             settings=_SELECT_SETTINGS,
         )
@@ -289,7 +303,11 @@ class ClickHouseStore:
 
     def _search(self, query: str, parameters: dict[str, Any]) -> list[SearchHit]:
         self._ensure_schema()
-        rows = self._client.query(query, parameters=parameters, settings=_SELECT_SETTINGS)
+        rows = self._client.query(
+            query.replace("@passages@", self._passage_source),
+            parameters=parameters,
+            settings=_SELECT_SETTINGS,
+        )
         return [_hit(row) for row in rows.result_rows]
 
 

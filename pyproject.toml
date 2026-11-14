@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clickhouserag"
-version = "1.0.1"
-description = "Dense, lexical and hybrid retrieval for RAG applications on ClickHouse"
+version = "1.1.0-rc.1"
+description = "Cited text, vector and graph retrieval for RAG applications on ClickHouse"
 readme = "README.md"
 requires-python = ">=3.11,<3.16"
 license = "MIT"
@@ -19,6 +19,8 @@ keywords = [
     "full-text-search",
     "information-retrieval",
     "embeddings",
+    "graphrag",
+    "knowledge-augmented-generation",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -70,6 +72,11 @@ major_on_zero = true
 [tool.semantic_release.branches.main]
 match = "main"
 prerelease = false
+
+[tool.semantic_release.branches.candidates]
+match = "release/.*-rc"
+prerelease = true
+prerelease_token = "rc"
 
 [tool.semantic_release.changelog]
 mode = "update"

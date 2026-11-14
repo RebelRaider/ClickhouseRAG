@@ -2,6 +2,88 @@
 
 <!-- version list -->
 
+## v1.1.0-rc.1 (2026-11-14)
+
+Hybrid is the default for document retrieval and answers. Choose
+`mode="mixed"` or `mode="graph"` for relationship expansion. The HotpotQA
+bridge benchmark reports the evidence, answer and citation trade-offs.
+
+### Bug Fixes
+
+- **graph**: Distinguish typed nodes and bound evidence interleaving cost
+  ([`8603636`](https://github.com/RebelRaider/ClickhouseRAG/commit/86036361e70d6bb09d45d34f3f6f5f553913fe3f))
+
+- **knowledge**: Abstain on invalid model plans and validate extracted names
+  ([`ae9ce3e`](https://github.com/RebelRaider/ClickhouseRAG/commit/ae9ce3eda84bb8fb8af3756cd96e21b2ce3b278b))
+
+- **models**: Bound Ollama fact extraction per passage
+  ([`4a5cdd6`](https://github.com/RebelRaider/ClickhouseRAG/commit/4a5cdd6ae1a6728b9cc6fcc5d762ebc20ac2edb2))
+
+- **models**: Constrain citation IDs and planner fields in structured output
+  ([`5300f55`](https://github.com/RebelRaider/ClickhouseRAG/commit/5300f55c1b6473edb4ac4885b0e8801dfbd0cce1))
+
+### Documentation
+
+- Link the framework walkthrough from the README
+  ([`262a967`](https://github.com/RebelRaider/ClickhouseRAG/commit/262a9672f344f52130191bd8aed3696096ea6e50))
+
+- Prepare framework adoption and release candidate metadata
+  ([`508eb9c`](https://github.com/RebelRaider/ClickhouseRAG/commit/508eb9c0a86f272ec6e53a6f4eeda09323b360dc))
+
+- Record the reproducible graph evaluation baseline
+  ([`bcb5391`](https://github.com/RebelRaider/ClickhouseRAG/commit/bcb5391125e432481de8b8aa371b59436d2c4695))
+
+- Specify the ClickHouse RAG framework and verification stages
+  ([`13da92e`](https://github.com/RebelRaider/ClickhouseRAG/commit/13da92ebb1cb5dafd4829a6ab6b4a75e50b08b53))
+
+### Features
+
+- Add cited graph retrieval, typed knowledge reasoning and RAG evaluation
+  ([`cfbd7cc`](https://github.com/RebelRaider/ClickhouseRAG/commit/cfbd7cc39f60ab91d04e4ac7eba5890898caf379))
+
+- **documents**: Publish replacements and deletions with cited graph facts
+  ([`a624e87`](https://github.com/RebelRaider/ClickhouseRAG/commit/a624e87eaf5e2de28d0c4a4829f080ea6fc184b1))
+
+- **evaluation**: Add reproducible HotpotQA comparison harness
+  ([`813838d`](https://github.com/RebelRaider/ClickhouseRAG/commit/813838d8a8a4890f014a1cef6a3cde92d4f64049))
+
+- **evaluation**: Report quality and latency by query category
+  ([`1e2b562`](https://github.com/RebelRaider/ClickhouseRAG/commit/1e2b56265d3c2545de6e3acd06325f7d11b98193))
+
+- **graph**: Add scoped corpus summaries with diverse cited evidence
+  ([`dda57ca`](https://github.com/RebelRaider/ClickhouseRAG/commit/dda57ca1cbe212d319d03b9af914b9f18412ed48))
+
+- **knowledge**: Accept explicit plans for cited answers
+  ([`d8009f2`](https://github.com/RebelRaider/ClickhouseRAG/commit/d8009f2fcda6b8c4fafd93e58c8edc43ca012362))
+
+- **knowledge**: Generate typed intersections and require complete citations
+  ([`7581975`](https://github.com/RebelRaider/ClickhouseRAG/commit/758197553e924a168f776a5d3edec10116f86b06))
+
+- **knowledge**: Intersect typed paths with complete source evidence
+  ([`c250563`](https://github.com/RebelRaider/ClickhouseRAG/commit/c250563decf16db0f5f6d36f966d8576afef10a6))
+
+- **models**: Add local Ollama integration for the RAG pipeline
+  ([`400dbac`](https://github.com/RebelRaider/ClickhouseRAG/commit/400dbacd8d8b6e6a11b13621c460d1a9c6066d13))
+
+- **models**: Configure a RAG collection in one Ollama call
+  ([`488898d`](https://github.com/RebelRaider/ClickhouseRAG/commit/488898d9edaf8f6d191c4945127f8f7016a2df2e))
+
+### Performance Improvements
+
+- **graph**: Rank visible entity candidates inside ClickHouse
+  ([`5e36757`](https://github.com/RebelRaider/ClickhouseRAG/commit/5e367573dd6dcd2fc760c5edf5dc311d447120da))
+
+### Refactoring
+
+- **evaluation**: Name summary metrics in the report constructor
+  ([`410cc5e`](https://github.com/RebelRaider/ClickhouseRAG/commit/410cc5eb15f3d6a2058eee26caf0d42dbc159c50))
+
+### Testing
+
+- **evaluation**: Exercise knowledge intersections and corpus overview
+  ([`743a176`](https://github.com/RebelRaider/ClickhouseRAG/commit/743a1768145a4655d2600a7c1db1ea6ad5df11d9))
+
+
 ## v1.0.1 (2026-11-14)
 
 ### Bug Fixes
