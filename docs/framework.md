@@ -50,8 +50,13 @@ It does not judge whether the generated claim entails the evidence.
   Plans are validated against the schema and executed with bound parameters.
   An invalid chain produces an abstention in `ask_knowledge`. Use `reason`
   with an explicit plan when the application already knows the chain.
-  Corpus-wide community summaries are described in the
-  [framework design](maintainer/framework.md).
+- `retrieve(question, mode="global")` broadens the context beyond matching
+  one entity. It groups the scoped facts into connected components and
+  balances citations across groups and documents. `ask` can summarize
+  those groups using the same answer provider. For bounded corpus reviews,
+  `overview(question, max_facts=...)` exposes a `truncated` flag when the fact
+  scan exhausts its budget. A corpus dominated by one connected component
+  needs finer clustering for a useful topical split.
 
 ## Updates and deployment
 

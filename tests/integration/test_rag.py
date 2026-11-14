@@ -279,3 +279,51 @@ def test_mixed_retrieval_drops_evidence_replaced_between_stages(rag: RAG) -> Non
         result = rag.retrieve("Gateway", mode="mixed")
     assert [p.target for p in result.paths] == ["beta"]
     assert [c.source for c in result.passages] == ["ref:new"]
+
+
+def test_global_coverage_uses_current_scope_and_signals_truncation(rag: RAG) -> None:
+    for document in [
+        Document("gateway", "Gateway calls Ledger.", "ref:gateway", {"team": "ops"}),
+        Document("ledger", "Ledger writes Vault.", "ref:ledger", {"team": "ops"}),
+        Document("mailer", "Mailer calls Queue.", "ref:mailer", {"team": "ops"}),
+        Document("queue", "Queue writes Archive.", "ref:queue", {"team": "ops"}),
+        Document("hidden", "Ledger calls Mailer.", "ref:hidden", {"team": "other"}),
+    ]:
+        rag.index(document)
+
+    scope = {"team": "ops"}
+    result = rag.retrieve("What are the major themes?", mode="global", metadata=scope, limit=2)
+    assert len(result.passages) == len(result.communities) == 2
+    assert {community.entities for community in result.communities} == {
+        ("gateway", "ledger", "vault"),
+        ("archive", "mailer", "queue"),
+    }
+    assert all(c.document_count == c.fact_count == 2 for c in result.communities)
+    assert not result.truncated
+    assert len(rag.overview("What are the major themes?").communities) == 1
+    assert rag.overview("What are the major themes?", metadata=scope, max_facts=2).truncated
+    rag.delete("ledger")
+    result = rag.overview("storage", metadata=scope)
+    assert "vault" not in {entity for row in result.communities for entity in row.entities}
+    assert "ref:ledger" not in {chunk.source for chunk in result.passages}
+
+
+def test_global_answer_passes_grouped_evidence_to_provider(
+    rag: RAG,
+    database_client: Client,
+    table: str,
+) -> None:
+    class Summarizer(ToyProvider):
+        def generate(self, question: str, context: Context) -> GeneratedAnswer:
+            assert len(context.communities) == 2
+            return GeneratedAnswer("Two themes", [chunk.chunk_id for chunk in context.passages])
+
+    rag.index(Document("gateway", "Gateway calls Ledger.", "ref:a"))
+    rag.index(Document("mailer", "Mailer calls Queue.", "ref:b"))
+    provider = Summarizer()
+    reader = RAG(
+        database_client, provider, table=table, dimensions=2, graph=True, generator=provider
+    )
+    result = reader.ask("Which separate workflows are represented?", mode="global")
+    assert result.text == "Two themes"
+    assert {chunk.source for chunk in result.citations} == {"ref:a", "ref:b"}

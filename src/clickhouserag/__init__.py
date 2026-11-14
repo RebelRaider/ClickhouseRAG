@@ -1,5 +1,6 @@
 """Framework-independent retrieval for ClickHouse-backed RAG applications."""
 
+from clickhouserag._communities import Community
 from clickhouserag._documents import DocumentRevisionError
 from clickhouserag.evaluation import CaseScore, EvalCase, Evaluation, Metrics, evaluate
 from clickhouserag.graph import GraphPath, GraphStep, GraphStore, Relation
@@ -31,6 +32,7 @@ __all__ = [
     "CaseScore",
     "Chunk",
     "ClickHouseStore",
+    "Community",
     "Context",
     "Document",
     "DocumentRevisionError",

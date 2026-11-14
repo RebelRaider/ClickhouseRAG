@@ -78,6 +78,24 @@ LIMIT {fanout:UInt32} BY e.subject
 """
 
 
+_CORPUS_FACTS_SQL = """
+WITH visible AS (
+    SELECT chunk_id, document_id, text, source, revision, metadata
+    FROM @support@
+    WHERE namespace = {namespace:String}
+        AND arrayAll(pair -> mapContains(metadata, pair.1)
+            AND metadata[pair.1] = pair.2, {filters:Array(Tuple(String, String))})
+)
+SELECT DISTINCT e.subject, e.predicate, e.object, e.chunk_id, e.revision,
+    p.document_id, p.text, p.source, p.metadata, e.subject_type, e.object_type
+FROM @edges@ AS e
+INNER JOIN visible AS p ON e.chunk_id = p.chunk_id AND e.revision = p.revision
+WHERE e.namespace = {namespace:String}
+ORDER BY e.subject, e.predicate, e.object, e.chunk_id, e.subject_type, e.object_type
+LIMIT {edge_limit:UInt32}
+"""
+
+
 @dataclass(frozen=True, slots=True)
 class Relation:
     """A directed fact asserted by one specific passage revision."""
@@ -315,34 +333,46 @@ class GraphStore:
             settings=_SELECT_SETTINGS,
         )
         grouped: defaultdict[str, list[GraphStep]] = defaultdict(list)
-        for (
-            subject,
-            predicate,
-            obj,
-            chunk_id,
-            revision,
-            document_id,
-            text,
-            source,
-            metadata,
-            subject_type,
-            object_type,
-        ) in result.result_rows:
-            grouped[subject].append(
-                GraphStep(
-                    Relation(
-                        subject,
-                        predicate,
-                        obj,
-                        chunk_id,
-                        revision,
-                        subject_type or None,
-                        object_type or None,
-                    ),
-                    Chunk(chunk_id, document_id, text, source, revision, metadata),
-                )
-            )
+        for row in result.result_rows:
+            step = _graph_step(row)
+            grouped[step.relation.subject].append(step)
         return grouped
+
+    def _corpus_facts(
+        self, namespace: str, metadata: Mapping[str, str] | None, edge_limit: int
+    ) -> list[GraphStep]:
+        params = _scope(namespace, metadata, 1)
+        self._ensure_schema()
+        result = self._client.query(
+            _CORPUS_FACTS_SQL.replace("@edges@", self._edges_query).replace(
+                "@support@", self._support_query
+            ),
+            parameters={**params, **self._location, "edge_limit": edge_limit},
+            settings=_SELECT_SETTINGS,
+        )
+        return [_graph_step(row) for row in result.result_rows]
+
+
+def _graph_step(row: Sequence[Any]) -> GraphStep:
+    (
+        subject,
+        predicate,
+        obj,
+        chunk_id,
+        revision,
+        document_id,
+        text,
+        source,
+        metadata,
+        subject_type,
+        object_type,
+    ) = row
+    return GraphStep(
+        Relation(
+            subject, predicate, obj, chunk_id, revision, subject_type or None, object_type or None
+        ),
+        Chunk(chunk_id, document_id, text, source, revision, metadata),
+    )
 
 
 def canonical_entity(value: str) -> str:

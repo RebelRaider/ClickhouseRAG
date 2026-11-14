@@ -4,10 +4,17 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from itertools import zip_longest
 from typing import Literal, Protocol, TypedDict
 
 from clickhouse_connect.driver.client import Client
 
+from clickhouserag._communities import (
+    _DEFAULT_EDGE_BUDGET,
+    _MAX_EDGE_BUDGET,
+    Community,
+    select_communities,
+)
 from clickhouserag._documents import DocumentStore, _Fact
 from clickhouserag._validation import _MAX_BATCH, _MAX_LIMIT, integer, nonblank, string_map
 from clickhouserag.graph import GraphPath, GraphStore, Relation, _document_fact
@@ -59,6 +66,8 @@ class Context:
 
     passages: tuple[Chunk, ...]
     paths: tuple[GraphPath, ...] = ()
+    communities: tuple[Community, ...] = ()
+    truncated: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +98,9 @@ class Answer:
 class _Scope(TypedDict):
     namespace: str
     metadata: Mapping[str, str] | None
+
+
+_Mode = Literal["dense", "lexical", "hybrid", "graph", "mixed", "global"]
 
 
 class RAG:
@@ -213,7 +225,7 @@ class RAG:
         self,
         query: str,
         *,
-        mode: Literal["dense", "lexical", "hybrid", "graph", "mixed"] = "mixed",
+        mode: _Mode = "mixed",
         metadata: Mapping[str, str] | None = None,
         seeds: Sequence[str] | None = None,
         limit: int = 10,
@@ -222,8 +234,10 @@ class RAG:
         """Retrieve passages and whole cited paths within the passage limit."""
         nonblank(query, "query")
         integer(limit, "limit", _MAX_LIMIT)
-        if mode not in ("dense", "lexical", "hybrid", "graph", "mixed"):
+        if mode not in ("dense", "lexical", "hybrid", "graph", "mixed", "global"):
             raise ValueError("unknown retrieval mode")
+        if mode == "global":
+            return self.overview(query, metadata=metadata, limit=limit)
         if mode == "graph" and self.graph is None:
             raise ValueError("graph mode requires graph configuration")
         filters = string_map(metadata) if metadata is not None else None
@@ -240,6 +254,32 @@ class RAG:
         if self.graph is not None and mode in ("graph", "mixed"):
             hits, paths = self._visible_evidence(hits, paths)
         return _context(hits, paths, limit)
+
+    def overview(
+        self,
+        query: str,
+        *,
+        metadata: Mapping[str, str] | None = None,
+        limit: int = 10,
+        max_facts: int = _DEFAULT_EDGE_BUDGET,
+    ) -> Context:
+        """Return cited representatives of connected groups across the scoped corpus."""
+        nonblank(query, "query")
+        integer(limit, "limit", _MAX_LIMIT)
+        integer(max_facts, "max_facts", _MAX_EDGE_BUDGET)
+        if self.graph is None:
+            raise ValueError("global mode requires graph configuration")
+        facts = self.graph._corpus_facts(self._namespace, metadata, max_facts + 1)
+        communities = select_communities(query, facts[:max_facts], limit=limit)
+        passages = {
+            chunk.chunk_id: chunk
+            for row in zip_longest(*(item.passages for item in communities))
+            for chunk in row
+            if chunk is not None
+        }
+        return Context(
+            tuple(passages.values()), communities=communities, truncated=len(facts) > max_facts
+        )
 
     def reason(
         self,
@@ -284,7 +324,7 @@ class RAG:
         self,
         question: str,
         *,
-        mode: Literal["dense", "lexical", "hybrid", "graph", "mixed"] = "mixed",
+        mode: _Mode = "mixed",
         metadata: Mapping[str, str] | None = None,
         seeds: Sequence[str] | None = None,
         limit: int = 10,

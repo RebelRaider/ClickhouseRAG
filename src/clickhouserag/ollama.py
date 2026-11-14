@@ -244,6 +244,15 @@ class Ollama:
             {
                 "question": question,
                 "evidence": [{"id": key, "text": chunk.text} for key, chunk in keys.items()],
+                "communities": [
+                    {
+                        "entities": item.entities[:32],
+                        "document_count": item.document_count,
+                        "evidence_ids": [evidence_ids[chunk.chunk_id] for chunk in item.passages],
+                    }
+                    for item in context.communities
+                ],
+                "truncated": context.truncated,
                 "paths": [
                     [
                         {

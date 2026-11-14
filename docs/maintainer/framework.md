@@ -88,3 +88,16 @@ assembled evidence against the published revisions. An update during retrieval
 may result in fewer returned passages or paths. Visibility is defined for
 queries on the same ClickHouse server. Physical retention of superseded data
 is a separate operation.
+
+
+### Global retrieval
+
+The global strategy groups current, scoped relation assertions into connected
+components at query time. It ranks components by query token matches, distinct
+documents and distinct facts. It samples supporting passages across groups
+and source documents. This design draws on
+[GraphRAG's global query model](https://microsoft.github.io/graphrag/query/global_search/).
+It uses connected components with citations instead of hierarchical clustering
+or persisted LLM summaries. The evidence budget makes this a bounded
+overview. Results expose truncation rather than presenting a partial graph as
+the entire corpus.
