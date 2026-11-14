@@ -115,13 +115,17 @@ class GeminiChat:
                 },
             },
         )
-        candidate = single_record(result.get("candidates"))
-        content = candidate.get("content")
-        if candidate.get("finishReason") != "STOP" or not isinstance(content, dict):
-            raise ModelResponseError("Gemini did not complete the requested JSON response")
-        parts = content.get("parts")
-        if not isinstance(parts, list) or any(not isinstance(part, dict) for part in parts):
-            raise ModelResponseError("Gemini returned invalid content parts")
-        return model_text(
-            "".join(model_text(part.get("text")) for part in parts if not part.get("thought"))
-        )
+        return _generated_text(result)
+
+
+def _generated_text(result: dict[str, Any]) -> str:
+    candidate = single_record(result.get("candidates"))
+    content = candidate.get("content")
+    if candidate.get("finishReason") != "STOP" or not isinstance(content, dict):
+        raise ModelResponseError("Gemini did not complete the requested JSON response")
+    parts = content.get("parts")
+    if not isinstance(parts, list) or any(not isinstance(part, dict) for part in parts):
+        raise ModelResponseError("Gemini returned invalid content parts")
+    return model_text(
+        "".join(model_text(part.get("text")) for part in parts if not part.get("thought"))
+    )
