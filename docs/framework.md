@@ -16,10 +16,12 @@ uv run --locked python examples/graph_rag.py --evaluate
 
 The program indexes two documents, returns a two-hop answer with links to
 both supporting documents, and runs a structured query against typed
-relationships. The evaluation flag adds two distractors and compares dense,
-lexical, hybrid, graph, and mixed search. KAG receives typed plans for the
-multi-hop and no-answer cases. Tests on this synthetic corpus verify the
-flow and metric behavior. They do not estimate quality on arbitrary text.
+relationships. The evaluation flag adds distractors, a second service chain
+to the same database, and an independent group. It compares dense, lexical,
+hybrid, graph and mixed search, and exercises KAG intersections and corpus
+overviews on their own labelled questions. The bundled evaluation uses
+synthetic text and controlled providers. The [benchmark guide](benchmark.md)
+describes the public HotpotQA comparison.
 
 ## Use your models
 

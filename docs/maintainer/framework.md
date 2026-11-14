@@ -72,6 +72,15 @@ question to mention the intermediate service explicitly caused that model to
 produce an invalid plan and abstain. Treat the example as an end-to-end
 integration check. The planner still needs paraphrase and ambiguity evaluation.
 
+The expanded offline fixture adds a shared endpoint and a second community.
+The two-hop lookup retrieves both references in graph and mixed mode and
+one of the two with dense, lexical and hybrid at a two-passage budget. The
+planned KAG intersection cites all four references. The corpus overview
+finds both topics at a four-passage budget and retrieves two of the four
+labelled passages. Different passages in the first topic compete for that
+same budget. See the [benchmark guide](../benchmark.md) for the comparison
+on public text.
+
 ### Document publication
 
 The document facade uses a managed passage table. It stages immutable passages

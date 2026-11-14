@@ -18,6 +18,7 @@ from clickhouserag import (
     Evaluation,
     ExtractedRelation,
     GeneratedAnswer,
+    KnowledgeIntersection,
     KnowledgeQuery,
     Predicate,
     evaluate,
@@ -40,7 +41,34 @@ class DemoModel:
         kind = "database" if verb == "writes" else "service"
         return [ExtractedRelation(subject, verb, target, "service", kind)]
 
+    def plan(
+        self, question: str, schema: tuple[Predicate, ...]
+    ) -> KnowledgeQuery | KnowledgeIntersection | None:
+        gateway = KnowledgeQuery("Gateway", "service", ("calls", "writes"))
+        if question == "Gateway":
+            return KnowledgeQuery("Gateway", "service", ("calls",))
+        if question.startswith("Which database do Gateway and Worker"):
+            return KnowledgeIntersection(
+                (gateway, KnowledgeQuery("Worker", "service", ("calls", "writes")))
+            )
+        if question.startswith("Where does Gateway"):
+            return gateway
+        return None
+
     def generate(self, question: str, context: Context) -> GeneratedAnswer:
+        if question == "Summarize the independent service groups.":
+            labels = {label for group in context.communities for label in group.entities}
+            if {"gateway", "billing"} <= labels:
+                return GeneratedAnswer(
+                    "Gateway and Billing", [c.chunk_id for c in context.passages]
+                )
+            return GeneratedAnswer(None)
+        if question.startswith("Which database do Gateway and Worker"):
+            required = {"gateway", "ledger", "worker", "audit"}
+            evidence = {c.document_id: c.chunk_id for c in context.passages}
+            if required <= evidence.keys():
+                return GeneratedAnswer("Vault", [evidence[key] for key in sorted(required)])
+            return GeneratedAnswer(None)
         facts = {
             (fact.subject, fact.predicate): (fact, chunk.chunk_id)
             for chunk in context.passages
@@ -62,6 +90,10 @@ def run_evaluation(rag: RAG) -> None:
     for document in (
         Document("detour", "Gateway deploys Proxy.", "https://example.org/proxy"),
         Document("monitor", "Gateway monitors Queue.", "https://example.org/queue"),
+        Document("worker", "Worker calls Audit.", "https://example.org/worker"),
+        Document("audit", "Audit writes Vault.", "https://example.org/audit"),
+        Document("billing", "Billing calls Invoice.", "https://example.org/billing"),
+        Document("invoice", "Invoice writes Archive.", "https://example.org/invoice"),
     ):
         rag.index(document)
     indexed = {
@@ -107,7 +139,27 @@ def run_evaluation(rag: RAG) -> None:
         }
         return Context(tuple(passages.values()), solved.evidence)
 
-    results["kag"] = evaluate(cases[1:], run_knowledge, k=2)
+    results["kag_explicit"] = evaluate(cases[1:], run_knowledge, k=2)
+    shared = EvalCase(
+        "intersection",
+        "Which database do Gateway and Worker both reach?",
+        frozenset(indexed[key] for key in ("gateway", "ledger", "worker", "audit")),
+        ("vault",),
+        "conjunctive query",
+    )
+    overview = EvalCase(
+        "overview",
+        "Summarize the independent service groups.",
+        frozenset(indexed[key] for key in ("gateway", "ledger", "billing", "invoice")),
+        ("Gateway and Billing",),
+        "corpus overview",
+    )
+    results["kag_planned"] = evaluate(
+        (*cases, shared), lambda case: rag.ask_knowledge(case.query, limit=4), k=4
+    )
+    results["global"] = evaluate(
+        (overview,), lambda case: rag.ask(case.query, mode="global", limit=4), k=4
+    )
     print(json.dumps({mode: asdict(run) for mode, run in results.items()}, indent=2))
 
 
@@ -131,6 +183,7 @@ def main() -> None:
             dimensions=2,
             extractor=model,
             generator=model,
+            planner=model,
             schema=(
                 Predicate("calls", "service", "service"),
                 Predicate("writes", "service", "database"),
