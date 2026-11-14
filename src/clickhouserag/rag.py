@@ -227,7 +227,7 @@ class RAG:
         self,
         query: str,
         *,
-        mode: _Mode = "mixed",
+        mode: _Mode = "hybrid",
         metadata: Mapping[str, str] | None = None,
         seeds: Sequence[str] | None = None,
         limit: int = 10,
@@ -238,6 +238,8 @@ class RAG:
         integer(limit, "limit", _MAX_LIMIT)
         if mode not in ("dense", "lexical", "hybrid", "graph", "mixed", "global"):
             raise ValueError("unknown retrieval mode")
+        if seeds is not None and mode not in ("graph", "mixed"):
+            raise ValueError("explicit seeds require graph or mixed mode")
         if mode == "global":
             return self.overview(query, metadata=metadata, limit=limit)
         if mode == "graph" and self.graph is None:
@@ -359,7 +361,7 @@ class RAG:
         self,
         question: str,
         *,
-        mode: _Mode = "mixed",
+        mode: _Mode = "hybrid",
         metadata: Mapping[str, str] | None = None,
         seeds: Sequence[str] | None = None,
         limit: int = 10,

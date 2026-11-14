@@ -95,7 +95,12 @@ def test_document_to_cited_answer(rag: RAG) -> None:
         KnowledgeQuery("Gateway", "service", ("calls", "writes")), metadata={"team": "ops"}
     )
     assert reasoning.entities == ("vault",)
-    answer = rag.ask(query, limit=2, metadata={"team": "ops"})
+    default = rag.retrieve(query, limit=2, metadata={"team": "ops"})
+    assert default == rag.retrieve(query, mode="hybrid", limit=2, metadata={"team": "ops"})
+    assert not default.paths
+    with pytest.raises(ValueError, match="explicit seeds"):
+        rag.retrieve(query, seeds=["Gateway"])
+    answer = rag.ask(query, mode="mixed", limit=2, metadata={"team": "ops"})
     assert answer.text == "vault"
     assert rag.ask_knowledge(query, limit=2).citations == answer.citations
     with patch.object(ToyProvider, "plan", side_effect=AssertionError("unused planner")):

@@ -193,7 +193,7 @@ def main() -> None:
         rag.index(Document("gateway", "Gateway calls Ledger.", "https://example.org/gateway"))
         rag.index(Document("ledger", "Ledger writes Vault.", "https://example.org/ledger"))
 
-        answer = rag.ask("Where does Gateway record data?")
+        answer = rag.ask("Where does Gateway record data?", mode="mixed")
         assert answer.text == "Vault"
         print(answer.text, [item.source for item in answer.citations])
         result = rag.reason(KnowledgeQuery("Gateway", "service", ("calls", "writes")))

@@ -39,11 +39,11 @@ It does not judge whether the generated claim entails the evidence.
   together. Reusing the same document ID with changed input supersedes the
   entire previous revision. Repeating the current payload returns zero and
   skips the models. `delete(document_id)` hides the document and its facts.
-- `retrieve(question)` defaults to mixed search. It selects matching entity
-  labels and follows directed relationships, then fills the remaining
-  context budget with hybrid text search. Use `seeds` for explicit entity IDs. Open a collection for reading with
-  `graph=True` to use its existing relationships without an extractor.
-  Without graph configuration mixed retrieval uses hybrid text search alone.
+- `retrieve(question)` defaults to hybrid text and vector search. Choose
+  `mode="mixed"` to expand matching entity labels through directed
+  relationships and fill the remaining budget with hybrid search. Use
+  `seeds` in `mixed` or `graph` mode for explicit entity IDs. To use existing
+  relationships without an extractor, open the collection with `graph=True`.
 - `reason(KnowledgeQuery(...))` follows up to four predicates in order. Pass
   `schema=(Predicate(...), ...)` to enable it. It requires matching stored
   endpoint types and returns the endpoints and complete supporting paths.
