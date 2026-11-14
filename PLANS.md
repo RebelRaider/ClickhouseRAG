@@ -44,3 +44,21 @@ may be published. The GitHub and PyPI states must be checked independently.
   and [hosted documentation](https://rebelraider.github.io/ClickhouseRAG/).
 - PyPI publishing uses the existing project and requires its owner to
   configure Trusted Publishing. The tag is already available on GitHub.
+
+## ClickHouse RAG framework
+
+The application-facing flow is to configure one ClickHouse client and model
+provider, index documents, retrieve or ask, and inspect the supporting evidence.
+Keep the existing 1.x passage APIs usable directly. New storage is provisioned
+alongside existing tables. No separate graph or vector service is required.
+
+| Stage | Deliverable | Verification |
+| --- | --- | --- |
+| Graph evidence | Same-namespace relationship indexing and bounded multi-hop retrieval with current passage citations | Both LTS servers, stale revisions, filtered intermediates, cycles, deterministic fanout |
+| Framework and GraphRAG | Document chunking, extraction provider, automatic query seeds, mixed retrieval, context assembly and optional generation with validated citations | Installable end-to-end example, persisted state, repeat indexing, empty evidence and provider failure |
+| KAG | Typed relation schema, validated structured plans, bounded reasoning and evidence for each step | Multi-hop, invalid plans, ambiguity and unanswerable queries against real ClickHouse |
+| Evaluation | Labelled dense, hybrid, graph and KAG comparison; ranking, answer/citation and latency metrics | Reproducible corpus and results by mode and query category, empty and failure cases |
+| Stabilization | Migration and operations, quickstart, packaging, CI and design trade-offs | Lowest-friction installed examples, run across supported ClickHouse versions, artifact-level verification |
+
+Sources and rationale are in the
+[framework design](docs/maintainer/framework.md).
