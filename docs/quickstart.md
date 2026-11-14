@@ -11,7 +11,7 @@ docker run --detach --rm --name chrag-demo \
   --env CLICKHOUSE_USER --env CLICKHOUSE_PASSWORD \
   clickhouse/clickhouse-server:26.8.36.3
 
-python -m pip install 'https://github.com/RebelRaider/ClickhouseRAG/releases/download/v1.0.0/clickhouserag-1.0.0-py3-none-any.whl'
+python -m pip install 'clickhouserag>=1,<2'
 ```
 
 If the server is still starting, wait until `curl -fsS http://127.0.0.1:8123/ping`

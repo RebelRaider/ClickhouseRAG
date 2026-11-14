@@ -3,8 +3,11 @@ site_description: Dense, lexical and hybrid retrieval backed by ClickHouse
 site_url: https://rebelraider.github.io/ClickhouseRAG/
 repo_url: https://github.com/RebelRaider/ClickhouseRAG
 repo_name: RebelRaider/ClickhouseRAG
+edit_uri: edit/main/docs/
 theme:
   name: mkdocs
+extra_css:
+  - assets/brand.css
 nav:
   - Home: index.md
   - Quickstart: quickstart.md
@@ -14,6 +17,7 @@ nav:
   - Retrieval benchmark: benchmark.md
   - Maintainers:
       - Design: maintainer/design.md
+      - Brand assets: maintainer/brand.md
       - Releases: maintainer/releases.md
 plugins:
   - search

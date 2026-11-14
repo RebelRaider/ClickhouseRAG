@@ -1,0 +1,11 @@
+# Brand assets
+
+ImageGen generated the logo and social preview. The icon is a transparent 256 px PNG. The preview is a 1280 × 669 JPEG for GitHub. The mark depicts a retrieval path between amber data columns.
+
+## Icon prompt
+
+Use case: logo-brand. Create just a distinctive new square 1:1 icon for the independent open-source package ClickHouse RAG. A dark almost-black graphite rounded-square badge with a crisp bold amber symbol: four offset upright column shapes form a passage or aisle, with two neat nodes joined by a single clean diagonal retrieval path crossing the negative space between the columns. The diagonal can be warm ivory for legibility. Strong silhouette, consistent line weight, optically centered, graphic flat Swiss industrial typography aesthetic without any typography. Clean sharply rendered edges, no texture, shadows, gradients, padding tricks, text, numbers, borders or watermark. The mark should be unmistakable at 32px and be visibly distinct from the official ClickHouse logo (no striped branding, no red column). The rounded dark square should fill roughly 90% of the canvas, with genuine transparent corners and background. Render only the one icon, straight-on.
+
+## Social preview prompt
+
+Use case: logo-brand. Create a polished wide GitHub social preview cover for the open-source Python package ClickHouse RAG. The attached square icon is the only visual reference: preserve its four golden inset columns, single ivory diagonal connection with round endpoints, and graphite rounded square badge. Use a generous safe margin for cropping to 1.91:1. Lay out the badge at left, centered vertically and sized to roughly 280 px in a 1280px wide output, and a highly legible dark-mode title lockup to the right. Exact title: “ClickHouse RAG”. Exact smaller subtitle: “Hybrid retrieval for ClickHouse”. Use white bold modern grotesk typography, smaller muted ivory copy, graphic amber mark, nearly black matte graphite background with an extremely subtle grid at the right edge only. No reflections or 3D, no gradients on the logo, no extra slogans, no official ClickHouse logotype. Center composition within the middle 76% vertically, preserve horizontal breathing room, professional minimal software identity. Landscape with the widest aspect ratio available.

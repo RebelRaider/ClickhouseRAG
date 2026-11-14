@@ -1,0 +1,16 @@
+.navbar.bg-primary {
+    background-color: #161719 !important;
+}
+
+.navbar .navbar-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.navbar .navbar-brand::before {
+    content: "";
+    width: 2rem;
+    height: 2rem;
+    background: url("clickhouserag-icon.png") center / contain no-repeat;
+}
