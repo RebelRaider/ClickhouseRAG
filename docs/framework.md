@@ -68,3 +68,60 @@ Keep model and corpus versions fixed across retrieval modes. Evaluate with a
 representative distribution of lookups, paraphrases, multi-hop and unanswerable
 questions. Measure project-appropriate p95 latency and report any truncated
 paths, retries or provider failures.
+
+## Local models with Ollama
+
+Use the supplied adapter to try arbitrary text with a local model server.
+Choose installed embedding and chat models; the chat model must support
+[structured outputs](https://docs.ollama.com/capabilities/structured-outputs).
+Set the dimension to a size supported by the embedding model.
+
+```python
+import clickhouse_connect
+
+from clickhouserag import RAG, Document, Predicate
+from clickhouserag.ollama import Ollama
+
+schema = (
+    Predicate("calls", "service", "service"),
+    Predicate("writes", "service", "database"),
+)
+model = Ollama(
+    embedding_model="embeddinggemma", chat_model="qwen2.5:1.5b", dimensions=768, schema=schema
+)
+with clickhouse_connect.get_client(
+    host="127.0.0.1",
+    autogenerate_session_id=False,
+    form_encode_query_params=True,
+) as client:
+    rag = RAG(
+        client,
+        model,
+        dimensions=model.dimensions,
+        table="service_runbooks",
+        extractor=model,
+        generator=model,
+        schema=schema,
+        planner=model,
+    )
+    rag.initialize()
+    rag.index(Document("gateway", "Gateway calls Ledger.", "https://example.org/gateway"))
+    rag.index(Document("ledger", "Ledger writes Vault.", "https://example.org/ledger"))
+    answer = rag.ask_knowledge("Which database does Gateway write to through Ledger?")
+    print(answer.text, [chunk.source for chunk in answer.citations])
+```
+
+The packaged example also accepts the ClickHouse connection variables from
+the quickstart and `OLLAMA_URL` for a nondefault local endpoint.
+
+```sh
+ollama pull embeddinggemma
+ollama pull qwen2.5:1.5b
+uv run --locked python examples/ollama_rag.py
+```
+
+The adapter uses the configured Ollama origin directly and sends input text
+to it. Use `embedding_version` to distinguish model revisions if reusing a tag.
+Change the table when moving to a different embedding space. The local
+offline example tests the RAG pipeline independently of Ollama. Model output
+quality depends on the schema, corpus and selected models.
