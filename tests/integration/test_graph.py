@@ -129,3 +129,14 @@ def test_knowledge_solves_only_a_complete_and_well_typed_chain(
         kg.solve(KnowledgeQuery("Ledger", "service", ("writes", "calls")))
     with pytest.raises(ValueError, match="unknown predicate"):
         kg.solve(KnowledgeQuery("Ledger", "service", ("unknown",)))
+
+
+def test_typed_paths_allow_the_same_name_to_refer_to_different_types(
+    graph: GraphStore, store: ClickHouseStore
+) -> None:
+    put(store, "primary")
+    graph.insert(
+        [Relation("Vault", "writes", "Vault", "primary", subject_type="service", object_type="db")]
+    )
+    paths = graph.expand(["Vault"], depth=1, predicates=["writes"], entity_types=["service", "db"])
+    assert [path.target for path in paths] == ["vault"]

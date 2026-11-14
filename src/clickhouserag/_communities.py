@@ -1,9 +1,8 @@
 """Deterministic connected components and evidence coverage for global search."""
 
-from collections import defaultdict
-from collections.abc import Iterable, Mapping
+from collections import defaultdict, deque
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
-from itertools import zip_longest
 
 from clickhouserag._lexical import terms
 from clickhouserag.graph import GraphStep
@@ -56,18 +55,11 @@ def select_communities(query: str, facts: list[GraphStep], *, limit: int) -> tup
     ranked = [item for _, item in sorted(candidates, key=lambda entry: entry[0])[:limit]]
     selected: list[list[Chunk]] = [[] for _ in ranked]
     passage_ids: set[str] = set()
-    exhausted = False
-    for batch in zip_longest(*(item.passages for item in ranked)):
-        for index, passage in enumerate(batch):
-            if passage is None:
-                continue
-            if passage.chunk_id not in passage_ids and len(passage_ids) == limit:
-                exhausted = True
-                continue
-            passage_ids.add(passage.chunk_id)
-            selected[index].append(passage)
-        if exhausted:
-            break
+    for index, passage in _round_robin(item.passages for item in ranked):
+        if passage.chunk_id not in passage_ids and len(passage_ids) == limit:
+            continue
+        passage_ids.add(passage.chunk_id)
+        selected[index].append(passage)
 
     return tuple(
         Community(item.entities, tuple(passages), item.document_count, item.fact_count)
@@ -98,7 +90,15 @@ def _representatives(steps: Iterable[GraphStep]) -> tuple[Chunk, ...]:
         by_document[step.chunk.document_id].setdefault(step.chunk.chunk_id, step.chunk)
     return tuple(
         chunk
-        for batch in zip_longest(*(values.values() for _, values in sorted(by_document.items())))
-        for chunk in batch
-        if chunk is not None
+        for _, chunk in _round_robin(values.values() for _, values in sorted(by_document.items()))
     )
+
+
+def _round_robin(groups: Iterable[Iterable[Chunk]]) -> Iterator[tuple[int, Chunk]]:
+    pending = deque((position, iter(items)) for position, items in enumerate(groups))
+    while pending:
+        position, items = pending.popleft()
+        item = next(items, None)
+        if item is not None:
+            yield position, item
+            pending.append((position, items))

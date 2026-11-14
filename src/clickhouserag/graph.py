@@ -253,7 +253,9 @@ class GraphStore:
         ids = _entities(seeds, "seeds")
         chain = _labels_for_hops(predicates, depth, "predicates")
         types = _labels_for_hops(entity_types, depth + 1, "entity_types")
-        frontier = [(GraphPath(seed, ()), frozenset((seed,))) for seed in ids]
+        frontier = [
+            (GraphPath(seed, ()), frozenset(((seed, types[0] if types else ""),))) for seed in ids
+        ]
         paths: list[GraphPath] = []
         for hop in range(depth):
             if not frontier:
@@ -269,8 +271,8 @@ class GraphStore:
             next_frontier = []
             for path, visited in frontier:
                 for step in grouped[path.target]:
-                    target = step.relation.object
-                    if target in visited or any(
+                    reached = (step.relation.object, types[hop + 1] if types else "")
+                    if reached in visited or any(
                         previous.chunk.chunk_id == step.chunk.chunk_id
                         and previous.chunk.revision != step.chunk.revision
                         for previous in path.steps
@@ -282,7 +284,7 @@ class GraphStore:
                         if len(paths) == limit:
                             return paths
                     if hop < depth - 1 and len(next_frontier) < _MAX_FRONTIER:
-                        next_frontier.append((next_path, visited | {target}))
+                        next_frontier.append((next_path, visited | {reached}))
             frontier = next_frontier
         return paths
 
