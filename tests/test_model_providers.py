@@ -267,3 +267,21 @@ def test_azure_v1_key_header_and_bearer_token_refresh() -> None:
         assert fixed["api-key"] == "fixture" and "Authorization" not in fixed
         assert first["Authorization"] == "Bearer first-token"
         assert second["Authorization"] == "Bearer second-token"
+
+
+def test_structured_search_plans_validate_the_wire_output() -> None:
+    chat = OpenAICompatibleResponses("chat", base_url=_BASE_URL)
+    model = StructuredLLM(chat)
+    results = [
+        {"searches": [{"text": "ERR-42", "mode": "lexical"}]},
+        {"searches": [{"text": "rewrite", "mode": "graph"}]},
+        {"searches": []},
+    ]
+    with patch.object(
+        chat._endpoint, "post", side_effect=[_reply("responses", item) for item in results]
+    ):
+        (first,) = model.plan_search("Recover from ERR-42", ("lexical", "hybrid"))
+        assert first.text == "ERR-42" and first.mode == "lexical" and first.seeds is None
+        with pytest.raises(ModelResponseError, match="unavailable"):
+            model.plan_search("question", ("lexical", "hybrid"))
+        assert model.plan_search("question", ("lexical", "hybrid")) == ()

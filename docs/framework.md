@@ -208,3 +208,11 @@ fuses the ranked passages, checks current document revisions across all
 searches, and gives complete graph paths priority within the final budget.
 Corpus-wide summaries and KAG proofs remain available through `overview`
 and `reason` or `ask_knowledge`.
+
+For model-driven search, pass `search_planner=StructuredLLM(backend)` and
+call `rag.ask_planned(question)`. The planner sees the question and
+available retrieval modes. Namespace and metadata come from the application.
+The built-in model planner can propose up to four search terms. An empty
+plan uses one hybrid search with the original question. Malformed plans
+raise a model error. Each query result goes through the same revision and
+citation checks as an explicitly composed plan.

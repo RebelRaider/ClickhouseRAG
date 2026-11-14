@@ -25,6 +25,7 @@ from clickhouserag.rag import (
     GeneratedAnswer,
     RelationExtractor,
     Reranker,
+    SearchPlanner,
     SearchQuery,
 )
 from clickhouserag.retriever import EmbeddingProvider, Retriever
@@ -65,6 +66,7 @@ __all__ = [
     "Retriever",
     "SchemaError",
     "SearchHit",
+    "SearchPlanner",
     "SearchQuery",
     "evaluate",
 ]

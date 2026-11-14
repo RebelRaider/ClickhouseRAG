@@ -122,6 +122,7 @@ class _Scope(TypedDict):
 _PassageMode = Literal["dense", "lexical", "hybrid", "graph", "mixed"]
 _Mode = Literal[_PassageMode, "global"]
 _MAX_QUERY_LANES = 8
+_PASSAGE_MODES = ("dense", "lexical", "hybrid", "graph", "mixed")
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,6 +133,14 @@ class SearchQuery:
     mode: _PassageMode = "hybrid"
     seeds: tuple[str, ...] | None = None
     depth: int = 2
+
+
+class SearchPlanner(Protocol):
+    """Propose bounded search terms and retrieval modes for a question."""
+
+    def plan_search(self, question: str, modes: tuple[_PassageMode, ...]) -> Sequence[SearchQuery]:
+        """Return searches using one or more of the available modes."""
+        ...
 
 
 class RAG:
@@ -151,6 +160,7 @@ class RAG:
         graph: bool = False,
         schema: tuple[Predicate, ...] | None = None,
         planner: KnowledgePlanner | None = None,
+        search_planner: SearchPlanner | None = None,
         reranker: Reranker | None = None,
         rerank_candidates: int = 32,
         chunker: Chunker | None = None,
@@ -188,6 +198,7 @@ class RAG:
             raise ValueError("a knowledge planner requires a schema")
         self._schema = schema or ()
         self._planner = planner
+        self._search_planner = search_planner
         self._extractor = extractor
         self._generator = generator
         self._reranker = reranker
@@ -283,7 +294,7 @@ class RAG:
         """Retrieve passages and whole cited paths within the passage limit."""
         nonblank(query, "query")
         integer(limit, "limit", _MAX_LIMIT)
-        if mode not in ("dense", "lexical", "hybrid", "graph", "mixed", "global"):
+        if mode not in (*_PASSAGE_MODES, "global"):
             raise ValueError("unknown retrieval mode")
         if seeds is not None and mode not in ("graph", "mixed"):
             raise ValueError("explicit seeds require graph or mixed mode")
@@ -333,9 +344,7 @@ class RAG:
         integer(candidates_per_query, "candidates_per_query", _MAX_LIMIT)
         filters = string_map(metadata) if metadata is not None else None
         searches = tuple(dict.fromkeys(queries))
-        if any(
-            query.mode not in ("dense", "lexical", "hybrid", "graph", "mixed") for query in searches
-        ):
+        if any(query.mode not in _PASSAGE_MODES for query in searches):
             raise ValueError("search plans require passage retrieval modes")
         passages: dict[str, Chunk] = {}
         ranks: list[list[str]] = []
@@ -378,6 +387,33 @@ class RAG:
             queries, metadata=metadata, limit=limit, candidates_per_query=candidates_per_query
         )
         return self._answer(question, context)
+
+    def ask_planned(
+        self,
+        question: str,
+        *,
+        metadata: Mapping[str, str] | None = None,
+        limit: int = 10,
+        candidates_per_query: int = 16,
+    ) -> Answer:
+        """Plan searches first and answer from their shared scoped evidence."""
+        nonblank(question, "question")
+        integer(limit, "limit", _MAX_LIMIT)
+        integer(candidates_per_query, "candidates_per_query", _MAX_LIMIT)
+        filters = string_map(metadata) if metadata is not None else None
+        if self._search_planner is None or self._generator is None:
+            raise ValueError("ask_planned requires a search planner and an answer provider")
+        modes = _PASSAGE_MODES if self.graph is not None else _PASSAGE_MODES[:3]
+        queries = self._search_planner.plan_search(question, modes)
+        if any(query.mode not in modes for query in queries):
+            raise ValueError("search planner returned an unavailable mode")
+        return self.ask_many(
+            question,
+            queries or (SearchQuery(question),),
+            metadata=filters,
+            limit=limit,
+            candidates_per_query=candidates_per_query,
+        )
 
     def overview(
         self,

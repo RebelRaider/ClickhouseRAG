@@ -4,7 +4,7 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import asdict
 from itertools import pairwise
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from clickhouserag._lexical import terms
 from clickhouserag._validation import integer
@@ -16,7 +16,13 @@ from clickhouserag.knowledge import (
     Predicate,
 )
 from clickhouserag.models import Chunk
-from clickhouserag.rag import Context, ExtractedRelation, GeneratedAnswer
+from clickhouserag.rag import (
+    Context,
+    ExtractedRelation,
+    GeneratedAnswer,
+    SearchQuery,
+    _PassageMode,
+)
 
 _MAX_RELATIONS = 64
 _MAX_CONTEXT_CHARS = 80_000
@@ -235,6 +241,32 @@ class StructuredLLM(_StructuredTasks):
     ) -> None:
         super().__init__(schema, max_relations)
         self._backend = backend
+
+    def plan_search(
+        self, question: str, modes: tuple[_PassageMode, ...]
+    ) -> tuple[SearchQuery, ...]:
+        """Propose read-only ClickHouse searches for one question."""
+        result = self._structured(
+            "Rewrite the question as one to four short searches that together find its evidence. "
+            "Use lexical for exact phrases or identifiers, graph for named relationships, "
+            "and hybrid or dense for broader text search when those modes are available. "
+            "Keep the original meaning and proper nouns. Do not generate SQL or respond "
+            "with an answer. If no useful plan can be formed, return an empty searches list.",
+            {"question": question, "available_modes": modes},
+            _object(searches=_array(_object(text=_STR, mode={"enum": list(modes)}), 4)),
+        )
+        rows = result.get("searches")
+        if not isinstance(rows, list) or len(rows) > 4:
+            raise ModelResponseError("Model returned an invalid search plan")
+        searches = []
+        for row in rows:
+            if not isinstance(row, dict) or row.get("mode") not in modes:
+                raise ModelResponseError("Model returned an unavailable search mode")
+            term = _text(row.get("text"))
+            if len(term) > 4096:
+                raise ModelResponseError("Model returned an oversized search query")
+            searches.append(SearchQuery(term, cast("_PassageMode", row["mode"])))
+        return tuple(searches)
 
     def _structured(
         self, system: str, data: dict[str, Any], schema: dict[str, Any]
