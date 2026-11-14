@@ -37,6 +37,9 @@ uv sync --locked
 uv run --locked python examples/basic_usage.py
 ```
 
+For the in-development framework API, see the
+[GraphRAG, KAG and evaluation walkthrough](docs/framework.md).
+
 See the [API reference](https://rebelraider.github.io/ClickhouseRAG/api/), [operations guide](https://rebelraider.github.io/ClickhouseRAG/operations/),
 [benchmark](https://rebelraider.github.io/ClickhouseRAG/benchmark/) and [design](https://rebelraider.github.io/ClickhouseRAG/maintainer/design/).
 
