@@ -25,7 +25,7 @@ revisions before joining by chunk ID and revision. Apply caller metadata scope
 to every supporting passage. A stale, absent, or filtered passage cannot serve
 as an intermediate relationship.
 
-The first traversal API takes explicit entity seeds. Use a sorted ClickHouse
+The traversal takes explicit seeds or labels ranked by ClickHouse token overlap. Use a sorted ClickHouse
 lookup per frontier with per-node and global limits. The query uses
 [ClickHouse LIMIT BY](https://clickhouse.com/docs/reference/statements/select/limit-by)
 and a [shared per-query snapshot](https://clickhouse.com/blog/clickhouse-release-25-06).

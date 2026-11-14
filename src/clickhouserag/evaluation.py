@@ -88,17 +88,17 @@ def evaluate(
         grouped[item.category].append((item, score))
     aggregate = _aggregate(pairs)
     return Evaluation(
-        aggregate.recall,
-        aggregate.mrr,
-        aggregate.ndcg,
-        aggregate.exact_match,
-        aggregate.citation_precision,
-        aggregate.citation_recall,
-        aggregate.abstention_accuracy,
-        aggregate.latency_p95_ms,
-        k,
-        scores,
-        {name: _aggregate(group) for name, group in sorted(grouped.items())},
+        k=k,
+        cases=scores,
+        by_category={name: _aggregate(group) for name, group in sorted(grouped.items())},
+        recall=aggregate.recall,
+        mrr=aggregate.mrr,
+        ndcg=aggregate.ndcg,
+        exact_match=aggregate.exact_match,
+        citation_precision=aggregate.citation_precision,
+        citation_recall=aggregate.citation_recall,
+        abstention_accuracy=aggregate.abstention_accuracy,
+        latency_p95_ms=aggregate.latency_p95_ms,
     )
 
 
