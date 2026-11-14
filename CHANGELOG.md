@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.2.0 (2026-11-14)
+
+- Compose independent models for embeddings, graph extraction, knowledge
+  planning and cited generation. Includes native Ollama, Claude, Gemini,
+  Cohere and Voyage plus OpenAI-compatible APIs and Azure OpenAI v1 auth.
+- Add optional reranking, custom chunking and versioned index preparation.
+- Use the PostgreSQL extra to deliver committed document changes into
+  ClickHouse. Existing ClickHouse collections keep their schema and Ollama
+  compatibility. See the [provider guide](https://rebelraider.github.io/ClickhouseRAG/providers/).
+
+
 ## v1.2.0-rc.1 (2026-11-14)
 
 ### Features
