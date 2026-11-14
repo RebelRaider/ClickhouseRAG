@@ -1,5 +1,7 @@
 # Changelog
 
+<!-- version list -->
+
 ## v1.0.0
 
 - Stable Python API for database-backed dense, lexical and hybrid passage search.
