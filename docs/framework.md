@@ -216,3 +216,11 @@ The built-in model planner can propose up to four search terms. An empty
 plan uses one hybrid search with the original question. Malformed plans
 raise a model error. Each query result goes through the same revision and
 citation checks as an explicitly composed plan.
+
+The `examples/planned_models.py` program uses Ollama to plan the searches,
+an OpenAI-compatible embedding endpoint and a separate Chat Completions
+writer. Set `RAG_EMBEDDING_URL` and `RAG_ANSWER_URL` to the API base URLs,
+and `OLLAMA_URL` to the planner's server. The example was verified locally
+with EmbeddingGemma and Qwen 2.5 hosted in llama.cpp and Qwen 2.5 in Ollama.
+It places matching documents in separate metadata scopes and cites the
+document allowed by the requested scope.
