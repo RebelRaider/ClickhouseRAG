@@ -178,3 +178,33 @@ Set an `index_revision` when changing the extraction model or schema too.
 This lets a changed indexing pipeline republish an otherwise identical
 document when using automatic revision assignment. With explicit revisions,
 enqueue a new revision for each affected source document.
+
+## Combine several searches in one answer
+
+Use `retrieve_many` for questions that benefit from multiple search terms or
+strategies. The application can supply a known plan, user-selected searches,
+or validated model-generated rewrites. The original question is passed to the
+answer provider separately from the terms used for search.
+
+```python
+from clickhouserag import SearchQuery
+
+searches = (
+    SearchQuery("retention exceptions", mode="hybrid"),
+    SearchQuery("ERR-1044", mode="lexical"),
+    SearchQuery("archive service", mode="graph", seeds=("Archive",)),
+)
+answer = rag.ask_many(
+    "When can we override the archive retention policy?",
+    searches,
+    metadata={"team": "operations"},
+    candidates_per_query=12,
+    limit=8,
+)
+```
+
+Up to eight searches share one namespace and metadata scope. The framework
+fuses the ranked passages, checks current document revisions across all
+searches, and gives complete graph paths priority within the final budget.
+Corpus-wide summaries and KAG proofs remain available through `overview`
+and `reason` or `ask_knowledge`.

@@ -1,5 +1,6 @@
 """Rank fusion for retrieval lists with different score scales."""
 
+from collections.abc import Iterable, Sequence
 from dataclasses import replace
 
 from clickhouserag.models import SearchHit
@@ -9,11 +10,18 @@ def reciprocal_rank_fusion(
     dense: list[SearchHit], lexical: list[SearchHit], limit: int
 ) -> list[SearchHit]:
     candidates: dict[str, SearchHit] = {}
-    scores: dict[str, float] = {}
+    ranks = []
     for hits in (dense, lexical):
-        for rank, hit in enumerate(hits, start=1):
-            chunk_id = hit.chunk.chunk_id
-            candidates.setdefault(chunk_id, hit)
+        ranks.append([hit.chunk.chunk_id for hit in hits])
+        for hit in hits:
+            candidates.setdefault(hit.chunk.chunk_id, hit)
+    return [replace(candidates[key], score=score) for key, score in fused_ranks(ranks)[:limit]]
+
+
+def fused_ranks(lanes: Iterable[Sequence[str]]) -> list[tuple[str, float]]:
+    """Fuse candidate IDs across ranked inputs with a deterministic tie rule."""
+    scores: dict[str, float] = {}
+    for lane in lanes:
+        for rank, chunk_id in enumerate(lane, start=1):
             scores[chunk_id] = scores.get(chunk_id, 0.0) + 1.0 / (60 + rank)
-    ranked = sorted(scores, key=lambda chunk_id: (-scores[chunk_id], chunk_id))[:limit]
-    return [replace(candidates[chunk_id], score=scores[chunk_id]) for chunk_id in ranked]
+    return sorted(scores.items(), key=lambda entry: (-entry[1], entry[0]))
