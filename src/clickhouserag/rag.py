@@ -17,6 +17,7 @@ from clickhouserag._communities import (
     select_communities,
 )
 from clickhouserag._documents import DocumentStore, _Fact
+from clickhouserag._ranking import fused_ranks
 from clickhouserag._validation import _MAX_BATCH, _MAX_LIMIT, integer, nonblank, string_map
 from clickhouserag.graph import GraphPath, GraphStore, Relation, _document_fact
 from clickhouserag.knowledge import (
@@ -118,7 +119,19 @@ class _Scope(TypedDict):
     metadata: Mapping[str, str] | None
 
 
-_Mode = Literal["dense", "lexical", "hybrid", "graph", "mixed", "global"]
+_PassageMode = Literal["dense", "lexical", "hybrid", "graph", "mixed"]
+_Mode = Literal[_PassageMode, "global"]
+_MAX_QUERY_LANES = 8
+
+
+@dataclass(frozen=True, slots=True)
+class SearchQuery:
+    """One deterministic search in an application-composed retrieval plan."""
+
+    text: str
+    mode: _PassageMode = "hybrid"
+    seeds: tuple[str, ...] | None = None
+    depth: int = 2
 
 
 class RAG:
@@ -305,6 +318,66 @@ class RAG:
                 raise ValueError("reranker must return a permutation of the candidate indices")
             hits, paths = self._visible_evidence([hits[index] for index in order], paths)
         return _context(hits, paths, limit)
+
+    def retrieve_many(
+        self,
+        queries: Sequence[SearchQuery],
+        *,
+        metadata: Mapping[str, str] | None = None,
+        limit: int = 10,
+        candidates_per_query: int = 16,
+    ) -> Context:
+        """Fuse scoped searches and retain complete graph paths under one passage budget."""
+        integer(len(queries), "number of searches", _MAX_QUERY_LANES)
+        integer(limit, "limit", _MAX_LIMIT)
+        integer(candidates_per_query, "candidates_per_query", _MAX_LIMIT)
+        filters = string_map(metadata) if metadata is not None else None
+        searches = tuple(dict.fromkeys(queries))
+        if any(
+            query.mode not in ("dense", "lexical", "hybrid", "graph", "mixed") for query in searches
+        ):
+            raise ValueError("search plans require passage retrieval modes")
+        passages: dict[str, Chunk] = {}
+        ranks: list[list[str]] = []
+        paths: dict[tuple[str, tuple[tuple[Relation, str], ...]], GraphPath] = {}
+        for query in searches:
+            result = self.retrieve(
+                query.text,
+                mode=query.mode,
+                metadata=filters,
+                seeds=query.seeds,
+                limit=candidates_per_query,
+                depth=query.depth,
+            )
+            ranks.append([chunk.chunk_id for chunk in result.passages])
+            passages.update((chunk.chunk_id, chunk) for chunk in result.passages)
+            for path in result.paths:
+                key = (
+                    path.seed,
+                    tuple((step.relation, step.chunk.chunk_id) for step in path.steps),
+                )
+                paths.setdefault(key, path)
+        hits = [SearchHit(passages[key], score) for key, score in fused_ranks(ranks)]
+        hits, visible_paths = self._visible_evidence(hits, tuple(paths.values()))
+        return _context(hits, visible_paths, limit)
+
+    def ask_many(
+        self,
+        question: str,
+        queries: Sequence[SearchQuery],
+        *,
+        metadata: Mapping[str, str] | None = None,
+        limit: int = 10,
+        candidates_per_query: int = 16,
+    ) -> Answer:
+        """Answer the original question using evidence fused from several searches."""
+        nonblank(question, "question")
+        if self._generator is None:
+            raise ValueError("ask_many requires an answer provider")
+        context = self.retrieve_many(
+            queries, metadata=metadata, limit=limit, candidates_per_query=candidates_per_query
+        )
+        return self._answer(question, context)
 
     def overview(
         self,

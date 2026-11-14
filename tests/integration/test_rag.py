@@ -18,6 +18,7 @@ from clickhouserag import (
     KnowledgePlanError,
     KnowledgeQuery,
     Predicate,
+    SearchQuery,
 )
 
 pytestmark = pytest.mark.integration
@@ -492,3 +493,31 @@ def test_index_pipeline_revision_republishes_same_source_with_new_chunking(
     assert updated.index(source) == 1
     passages = updated.retrieve("Ledger", mode="lexical").passages
     assert [(chunk.revision, chunk.source) for chunk in passages] == [(2, "ref:runbook")]
+
+
+def test_search_plan_fuses_passages_and_rechecks_complete_paths(rag: RAG) -> None:
+    rag.index(Document("gateway", "Gateway calls Ledger.", "ref:gateway", {"team": "ops"}))
+    rag.index(Document("ledger", "Ledger writes Vault.", "ref:ledger", {"team": "ops"}))
+    rag.index(Document("hidden", "Ledger writes Other.", "ref:hidden", {"team": "private"}))
+    query = (
+        SearchQuery("storage", mode="graph", seeds=("Gateway",)),
+        SearchQuery("Ledger", mode="lexical"),
+    )
+
+    answer = rag.ask_many("Where is Vault?", query, metadata={"team": "ops"}, limit=2)
+    assert answer.text == "vault"
+    assert [item.source for item in answer.citations] == ["ref:gateway", "ref:ledger"]
+    assert rag.retrieve_many((*query, *query), metadata={"team": "ops"}, limit=2) == answer.context
+
+    retrieve = rag.retrieve
+
+    def delete_after_first_search(text, **kwargs):
+        context = retrieve(text, **kwargs)
+        if kwargs["mode"] == "graph":
+            rag.delete("ledger")
+        return context
+
+    with patch.object(rag, "retrieve", side_effect=delete_after_first_search):
+        result = rag.retrieve_many(query, metadata={"team": "ops"}, limit=2)
+    assert [item.source for item in result.passages] == ["ref:gateway"]
+    assert not any(path.target == "vault" for path in result.paths)
