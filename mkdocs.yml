@@ -12,6 +12,8 @@ nav:
   - Home: index.md
   - Quickstart: quickstart.md
   - Framework quickstart: framework.md
+  - Model providers: providers.md
+  - PostgreSQL document delivery: postgres.md
   - API reference: api.md
   - Operations: operations.md
   - Upgrade from 0.x: migration.md

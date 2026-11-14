@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clickhouserag"
-version = "1.1.0"
+version = "1.2.0-rc.1"
 description = "Cited text, vector and graph retrieval for RAG applications on ClickHouse"
 readme = "README.md"
 requires-python = ">=3.11,<3.16"
@@ -37,6 +37,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = ["clickhouse-connect>=1.12,<2"]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.3.9,<4"]
 
 [project.urls]
 Changelog = "https://github.com/RebelRaider/ClickhouseRAG/blob/main/CHANGELOG.md"
@@ -97,7 +100,10 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers"
 testpaths = ["tests"]
-markers = ["integration: requires a real ClickHouse server"]
+markers = [
+    "integration: requires a real ClickHouse server",
+    "postgres: additionally requires a real PostgreSQL server",
+]
 xfail_strict = true
 
 [tool.coverage.run]

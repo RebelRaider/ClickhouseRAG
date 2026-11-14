@@ -18,11 +18,13 @@ from clickhouserag.rag import (
     RAG,
     Answer,
     AnswerProvider,
+    Chunker,
     Context,
     Document,
     ExtractedRelation,
     GeneratedAnswer,
     RelationExtractor,
+    Reranker,
 )
 from clickhouserag.retriever import EmbeddingProvider, Retriever
 from clickhouserag.store import ClickHouseStore
@@ -33,6 +35,7 @@ __all__ = [
     "AnswerProvider",
     "CaseScore",
     "Chunk",
+    "Chunker",
     "ClickHouseStore",
     "Community",
     "Context",
@@ -57,6 +60,7 @@ __all__ = [
     "Predicate",
     "Relation",
     "RelationExtractor",
+    "Reranker",
     "Retriever",
     "SchemaError",
     "SearchHit",

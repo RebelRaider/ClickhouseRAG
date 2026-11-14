@@ -3,7 +3,7 @@
 import hashlib
 import json
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import zip_longest
 from typing import Literal, Protocol, TypedDict
@@ -62,6 +62,14 @@ class RelationExtractor(Protocol):
         ...
 
 
+class Chunker(Protocol):
+    """Split source text into an ordered sequence of passages."""
+
+    def split(self, text: str) -> Iterable[str]:
+        """Yield source text or application-preprocessed passages in document order."""
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class Context:
     """Ordered source passages and paths whose every step has a citation."""
@@ -85,6 +93,14 @@ class AnswerProvider(Protocol):
 
     def generate(self, question: str, context: Context) -> GeneratedAnswer:
         """Generate an answer grounded in the supplied context."""
+        ...
+
+
+class Reranker(Protocol):
+    """Return a permutation of the ClickHouse candidates, best match first."""
+
+    def rank(self, query: str, passages: Sequence[Chunk]) -> Sequence[int]:
+        """Return only indices into the input sequence, with each index used once."""
         ...
 
 
@@ -122,13 +138,22 @@ class RAG:
         graph: bool = False,
         schema: tuple[Predicate, ...] | None = None,
         planner: KnowledgePlanner | None = None,
+        reranker: Reranker | None = None,
+        rerank_candidates: int = 32,
+        chunker: Chunker | None = None,
+        index_revision: str | None = None,
         chunk_size: int = 1600,
         chunk_overlap: int = 160,
     ) -> None:
         nonblank(namespace, "namespace")
         integer(chunk_size, "chunk_size", 100_000)
+        integer(rerank_candidates, "rerank_candidates", _MAX_LIMIT)
         if type(chunk_overlap) is not int or not 0 <= chunk_overlap < chunk_size:
             raise ValueError("chunk_overlap must be a nonnegative integer less than chunk_size")
+        if chunker is not None and index_revision is None:
+            raise ValueError("a custom chunker requires an index_revision")
+        if index_revision is not None:
+            nonblank(index_revision, "index_revision")
         self.passages = DocumentStore(
             client,
             table=table,
@@ -152,6 +177,10 @@ class RAG:
         self._planner = planner
         self._extractor = extractor
         self._generator = generator
+        self._reranker = reranker
+        self._rerank_candidates = rerank_candidates
+        self._chunker = chunker
+        self._index_revision = index_revision
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
 
@@ -166,15 +195,20 @@ class RAG:
         nonblank(document.text, "text")
         metadata = string_map(document.metadata)
         text = document.text.strip()
+        config = [
+            self._chunk_size,
+            self._chunk_overlap,
+            self._extractor is not None,
+        ]
+        if self._index_revision is not None:
+            config.extend((self._index_revision, self._chunker is not None))
         identity = hashlib.sha256(
             json.dumps(
                 [
                     text,
                     document.source,
                     metadata,
-                    self._chunk_size,
-                    self._chunk_overlap,
-                    self._extractor is not None,
+                    *config,
                 ],
                 sort_keys=True,
                 separators=(",", ":"),
@@ -246,16 +280,30 @@ class RAG:
             raise ValueError("graph mode requires graph configuration")
         filters = string_map(metadata) if metadata is not None else None
         scope: _Scope = {"namespace": self._namespace, "metadata": filters}
+        candidate_limit = (
+            max(limit, self._rerank_candidates) if self._reranker is not None else limit
+        )
         hits: list[SearchHit] = []
         if mode == "lexical":
-            hits = self.passages.search_lexical(query, limit=limit, **scope)
+            hits = self.passages.search_lexical(query, limit=candidate_limit, **scope)
         elif mode != "graph":
-            hits = self._retriever.search(query, limit=limit, hybrid=mode != "dense", **scope)
+            hits = self._retriever.search(
+                query, limit=candidate_limit, hybrid=mode != "dense", **scope
+            )
         paths = []
         if self.graph is not None and mode in ("graph", "mixed"):
             selected = self.graph.seed_entities(query, **scope) if seeds is None else seeds
             paths = self.graph.expand(selected, depth=depth, limit=min(limit * 4, 1000), **scope)
             hits, paths = self._visible_evidence(hits, paths)
+        if self._reranker is not None and len(hits) > 1:
+            order = tuple(self._reranker.rank(query, tuple(hit.chunk for hit in hits)))
+            if (
+                len(order) != len(hits)
+                or any(type(index) is not int for index in order)
+                or set(order) != set(range(len(hits)))
+            ):
+                raise ValueError("reranker must return a permutation of the candidate indices")
+            hits, paths = self._visible_evidence([hits[index] for index in order], paths)
         return _context(hits, paths, limit)
 
     def overview(
@@ -415,24 +463,35 @@ class RAG:
     def _chunks(
         self, document: Document, text: str, metadata: Mapping[str, str], revision: int
     ) -> list[Chunk]:
-        step = self._chunk_size - self._chunk_overlap
+        if self._chunker is None:
+            located = self._character_chunks(text)
+        else:
+            parts = self._chunker.split(text)
+            if isinstance(parts, (str, bytes)):
+                raise ValueError("chunker must return an iterable of passages, not a string")
+            located = enumerate(parts)
         chunks = []
-        for start in range(0, len(text), step):
-            chunk_text = text[start : start + self._chunk_size].strip()
-            if chunk_text:
-                if len(chunks) == _MAX_BATCH:
-                    raise ValueError(f"document produces more than {_MAX_BATCH} chunks")
-                key = hashlib.sha256(
-                    f"{document.document_id}\0{revision}\0{start}".encode()
-                ).hexdigest()
-                chunks.append(
-                    Chunk(
-                        key, document.document_id, chunk_text, document.source, revision, metadata
-                    )
-                )
+        for offset, part in located:
+            nonblank(part, "chunk text")
+            if len(chunks) == _MAX_BATCH:
+                raise ValueError(f"document produces more than {_MAX_BATCH} chunks")
+            key = hashlib.sha256(
+                f"{document.document_id}\0{revision}\0{offset}".encode()
+            ).hexdigest()
+            chunks.append(
+                Chunk(key, document.document_id, part, document.source, revision, metadata)
+            )
+        if not chunks:
+            raise ValueError("chunker must produce at least one passage")
+        return chunks
+
+    def _character_chunks(self, text: str) -> Iterable[tuple[int, str]]:
+        for start in range(0, len(text), self._chunk_size - self._chunk_overlap):
+            part = text[start : start + self._chunk_size].strip()
+            if part:
+                yield start, part
             if start + self._chunk_size >= len(text):
                 break
-        return chunks
 
 
 def _context(hits: list[SearchHit], paths: list[GraphPath], limit: int) -> Context:

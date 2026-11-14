@@ -58,3 +58,19 @@ The supported Python interface is imported directly from `clickhouserag`.
 ::: clickhouserag.evaluate
     options:
       show_root_heading: true
+
+## Model adapters and extension points
+
+::: clickhouserag.providers.JsonModel
+    options:
+      show_root_heading: true
+
+::: clickhouserag.providers.StructuredLLM
+    options:
+      show_root_heading: true
+
+::: clickhouserag.Reranker
+    options:
+      show_root_heading: true
+
+See the [provider guide](providers.md) for the concrete HTTP adapters.

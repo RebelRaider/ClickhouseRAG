@@ -71,3 +71,19 @@ and its wheel and sdist verified from the
 The [benchmark](docs/benchmark.md) records the 12-case public comparison and
 the synthetic shared-hub cost probe. Continue evaluating model planning,
 graph candidate ranking and community quality on representative workloads.
+
+## Composable model and retrieval integrations
+
+Keep ClickHouse as the evidence store and retrieval engine. Compose independent
+embedding, relation extraction, knowledge planning and answer stages. A model
+change must not require an application rewrite. A change to the vector space
+requires a fresh collection or an intentional backfill. Verify 1.1 workflows
+alongside new provider combinations.
+
+| Stage | Deliverable | Evidence |
+| --- | --- | --- |
+| Model adapters | OpenAI-compatible embeddings, Chat Completions and Responses, native Ollama, Claude, Gemini, Cohere and Voyage, plus a structured backend extension point | Request/response tests for every wire API and an independently composed ClickHouse + local model run |
+| Pipeline composition | Support independent retrieval, reranking and generation choices, with bounded candidates and stable source IDs | Retrieval-only and full RAG runs, scoped evidence after reranking, ambiguous and failed provider responses |
+| Additional local and managed runtimes | Exercise a local embedding server or in-process model and document capabilities across cloud gateways and engines | CPU or local end-to-end runs, supported Python matrix, optional dependencies stay optional |
+| PostgreSQL add-on | Evaluate using PostgreSQL as a source of authoritative documents or revisioned changes while ClickHouse serves retrieval | Source identity, restartable sync, replacements and deletion, real database tests if promoted |
+| Delivery | Docs and tested artifacts for model roles and supported API capabilities | Clean installs, supported Python and ClickHouse CI, reproducible examples without hosted credentials |

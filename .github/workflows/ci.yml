@@ -49,6 +49,8 @@ jobs:
       - run: |
           uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file "${RUNNER_TEMP}/runtime.txt"
           uv run --locked pip-audit --require-hashes -r "${RUNNER_TEMP}/runtime.txt"
+          uv export --locked --no-dev --extra postgres --no-emit-project --format requirements-txt --output-file "${RUNNER_TEMP}/postgres.txt"
+          uv run --locked pip-audit --require-hashes -r "${RUNNER_TEMP}/postgres.txt"
 
   test:
     name: Python ${{ matrix.python }} on ${{ matrix.os }}
@@ -73,7 +75,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ matrix.python }}
           enable-cache: false
-      - run: uv run --locked pytest -m "not integration"
+      - run: uv run --locked pytest -m "not integration" --ignore=tests/integration/test_postgres.py
 
   integration:
     name: ClickHouse ${{ matrix.version }}
@@ -115,10 +117,63 @@ jobs:
       - name: Run integration tests
         env:
           CLICKHOUSE_PORT: ${{ job.services.clickhouse.ports['8123'] }}
-        run: uv run --locked pytest --junitxml="${RUNNER_TEMP}/integration.xml" -m integration
+        run: uv run --locked pytest --junitxml="${RUNNER_TEMP}/integration.xml" -m "integration and not postgres" --ignore=tests/integration/test_postgres.py
       - name: Check that integration tests ran without skips
         run: python -c 'import os, xml.etree.ElementTree as ET; suite = ET.parse(os.environ["RUNNER_TEMP"] + "/integration.xml").find(".//testsuite"); assert int(suite.attrib["tests"]) > 0 and int(suite.attrib["skipped"]) == 0'
       - name: Install and run each distribution
         env:
           CLICKHOUSE_PORT: ${{ job.services.clickhouse.ports['8123'] }}
         run: bash scripts/smoke-artifacts.sh
+
+  postgres:
+    name: PostgreSQL document outbox
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:26.8.36.3@sha256:d426d2f612e1e189c90f9a3f8dcd85a03c6851273833817a296bb327e63aa7a7
+        env:
+          CLICKHOUSE_USER: chrag
+          CLICKHOUSE_PASSWORD: ci-only
+        ports:
+          - 8123/tcp
+        options: >-
+          --health-cmd "clickhouse-client --user chrag --password ci-only --query 'SELECT 1'"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+      postgres:
+        image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+        env:
+          POSTGRES_USER: chrag
+          POSTGRES_PASSWORD: ci-only
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready --username chrag"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.14"
+          enable-cache: false
+      - name: Verify document delivery across PostgreSQL and ClickHouse
+        env:
+          CH_RAG_POSTGRES_DSN: postgresql://chrag:ci-only@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/chrag
+          CLICKHOUSE_PORT: ${{ job.services.clickhouse.ports['8123'] }}
+          CLICKHOUSE_USER: chrag
+          CLICKHOUSE_PASSWORD: ci-only
+        run: uv run --locked --extra postgres pytest tests/integration/test_postgres.py
+      - name: Install the PostgreSQL extra from built distributions
+        run: |
+          uv build
+          for artifact in dist/*.whl dist/*.tar.gz; do
+            uv run --no-project --isolated --with "clickhouserag[postgres] @ file://$PWD/$artifact" \
+              python -c 'from clickhouserag.postgres import PostgresOutbox; PostgresOutbox()'
+          done
