@@ -8,8 +8,9 @@ from typing import Literal, Protocol, TypedDict
 
 from clickhouse_connect.driver.client import Client
 
+from clickhouserag._documents import DocumentStore, _Fact
 from clickhouserag._validation import _MAX_BATCH, _MAX_LIMIT, integer, nonblank, string_map
-from clickhouserag.graph import GraphPath, GraphStore, Relation
+from clickhouserag.graph import GraphPath, GraphStore, Relation, _document_fact
 from clickhouserag.knowledge import (
     Knowledge,
     KnowledgePlanError,
@@ -20,17 +21,17 @@ from clickhouserag.knowledge import (
 )
 from clickhouserag.models import Chunk, SearchHit
 from clickhouserag.retriever import EmbeddingProvider, Retriever
-from clickhouserag.store import ClickHouseStore
 
 
 @dataclass(frozen=True, slots=True)
 class Document:
-    """An immutable input document identified within a collection."""
+    """A document snapshot identified within a collection."""
 
     document_id: str
     text: str
     source: str
     metadata: Mapping[str, str] = field(default_factory=dict)
+    revision: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,7 +115,7 @@ class RAG:
         integer(chunk_size, "chunk_size", 100_000)
         if type(chunk_overlap) is not int or not 0 <= chunk_overlap < chunk_size:
             raise ValueError("chunk_overlap must be a nonnegative integer less than chunk_size")
-        self.passages = ClickHouseStore(
+        self.passages = DocumentStore(
             client,
             table=table,
             database=database,
@@ -141,34 +142,72 @@ class RAG:
         self._chunk_overlap = chunk_overlap
 
     def initialize(self) -> None:
-        """Provision the passage store and the optional graph once."""
+        """Provision the managed passage and fact table."""
         self.passages.initialize()
-        if self.graph is not None:
-            self.graph.initialize()
 
     def index(self, document: Document) -> int:
-        """Chunk and index one immutable document; an identical retry reuses its IDs."""
-        chunks = self._chunks(document)
+        """Publish this document's full contents; return the number of staged passages."""
+        nonblank(document.document_id, "document_id")
+        nonblank(document.source, "source")
+        nonblank(document.text, "text")
+        metadata = string_map(document.metadata)
+        text = document.text.strip()
+        identity = hashlib.sha256(
+            json.dumps(
+                [
+                    text,
+                    document.source,
+                    metadata,
+                    self._chunk_size,
+                    self._chunk_overlap,
+                    self._extractor is not None,
+                ],
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        revision = self.passages.next_revision(
+            self._namespace, document.document_id, identity, document.revision
+        )
+        if revision is None:
+            return 0
+        chunks = self._chunks(document, text, metadata, revision)
         rows = self.passages._prepare_rows(self._retriever._embed(chunks), self._namespace)
-        self.passages._ensure_schema()
-        if self.graph is not None and self._extractor is not None:
-            # A graph write is invisible until its supporting passage is present.
-            self.graph.insert(
-                (
-                    Relation(
-                        item.subject,
-                        item.predicate,
-                        item.object,
-                        chunk.chunk_id,
-                        subject_type=item.subject_type,
-                        object_type=item.object_type,
-                    )
-                    for chunk in chunks
-                    for item in self._extractor.extract(chunk)
-                ),
-                namespace=self._namespace,
+        facts = [self._facts(chunk) for chunk in chunks]
+        self.passages.publish(
+            self._namespace, document.document_id, revision, identity, rows, facts
+        )
+        return len(rows)
+
+    def delete(self, document_id: str, *, revision: int | None = None) -> bool:
+        """Hide a document and its facts by publishing a tombstone."""
+        nonblank(document_id, "document_id")
+        chosen = self.passages.next_revision(self._namespace, document_id, "", revision)
+        if chosen is None:
+            return False
+        self.passages.publish(self._namespace, document_id, chosen, "", [], [])
+        return True
+
+    def _facts(self, chunk: Chunk) -> list[_Fact]:
+        if self._extractor is None:
+            return []
+        extracted = self._extractor.extract(chunk)
+        if len(extracted) > _MAX_BATCH:
+            raise ValueError(f"a passage may contain at most {_MAX_BATCH} relations")
+        return sorted(
+            _document_fact(
+                Relation(
+                    item.subject,
+                    item.predicate,
+                    item.object,
+                    chunk.chunk_id,
+                    chunk.revision,
+                    item.subject_type,
+                    item.object_type,
+                )
             )
-        return self.passages._insert_rows(rows)
+            for item in extracted
+        )
 
     def retrieve(
         self,
@@ -198,6 +237,8 @@ class RAG:
         if self.graph is not None and mode in ("graph", "mixed"):
             selected = self.graph.seed_entities(query, **scope) if seeds is None else seeds
             paths = self.graph.expand(selected, depth=depth, limit=min(limit * 4, 1000), **scope)
+        if self.graph is not None and mode in ("graph", "mixed"):
+            hits, paths = self._visible_evidence(hits, paths)
         return _context(hits, paths, limit)
 
     def reason(
@@ -210,9 +251,11 @@ class RAG:
         """Resolve a typed knowledge plan in the same collection as text retrieval."""
         if self._knowledge is None:
             raise ValueError("reason requires a knowledge schema")
-        return self._knowledge.solve(
+        result = self._knowledge.solve(
             query, namespace=self._namespace, metadata=metadata, limit=limit
         )
+        _, paths = self._visible_evidence([], result.evidence)
+        return KnowledgeResult(tuple(dict.fromkeys(path.target for path in paths)), tuple(paths))
 
     def ask_knowledge(
         self,
@@ -277,37 +320,38 @@ class RAG:
             result.text, tuple(known[key] for key in dict.fromkeys(result.citation_ids)), context
         )
 
-    def _chunks(self, document: Document) -> list[Chunk]:
-        nonblank(document.document_id, "document_id")
-        nonblank(document.source, "source")
-        nonblank(document.text, "text")
-        metadata = string_map(document.metadata)
+    def _visible_evidence(
+        self, hits: list[SearchHit], paths: Sequence[GraphPath]
+    ) -> tuple[list[SearchHit], list[GraphPath]]:
+        chunks = [hit.chunk for hit in hits]
+        chunks.extend(step.chunk for path in paths for step in path.steps)
+        visible = self.passages.visible_chunks(self._namespace, chunks)
+        return (
+            [hit for hit in hits if (hit.chunk.chunk_id, hit.chunk.revision) in visible],
+            [
+                path
+                for path in paths
+                if all((step.chunk.chunk_id, step.chunk.revision) in visible for step in path.steps)
+            ],
+        )
+
+    def _chunks(
+        self, document: Document, text: str, metadata: Mapping[str, str], revision: int
+    ) -> list[Chunk]:
         step = self._chunk_size - self._chunk_overlap
         chunks = []
-        text = document.text.strip()
-        version = hashlib.sha256(
-            json.dumps(
-                [
-                    document.document_id,
-                    document.source,
-                    text,
-                    metadata,
-                    self._chunk_size,
-                    self._chunk_overlap,
-                ],
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode()
-        ).hexdigest()
         for start in range(0, len(text), step):
             chunk_text = text[start : start + self._chunk_size].strip()
             if chunk_text:
                 if len(chunks) == _MAX_BATCH:
                     raise ValueError(f"document produces more than {_MAX_BATCH} chunks")
-                # A different document snapshot gets a new set of chunk IDs.
-                key = f"{version}:{start}"
+                key = hashlib.sha256(
+                    f"{document.document_id}\0{revision}\0{start}".encode()
+                ).hexdigest()
                 chunks.append(
-                    Chunk(key, document.document_id, chunk_text, document.source, metadata=metadata)
+                    Chunk(
+                        key, document.document_id, chunk_text, document.source, revision, metadata
+                    )
                 )
             if start + self._chunk_size >= len(text):
                 break

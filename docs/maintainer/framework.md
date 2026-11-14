@@ -48,14 +48,11 @@ ability to guess answers.
 
 ## Work still in progress
 
-The initial implementation supports local directed traversal and a typed
-predicate chain. Next, add document lifecycle management so a replacement
-supersedes all of its former chunks together, including facts and shorter
-documents. Scope that change around the same revision invariants and add
-concurrency and retry tests. Compare graph query plans on graphs with
-high-degree nodes. Evaluate corpus-wide questions with separately generated
-community evidence and include a representative labelled corpus before
-promoting the framework release.
+The initial implementation supports local directed traversal, a typed predicate
+chain, and document revisions with logical deletion. Compare query plans on
+graphs with high-degree nodes. Evaluate corpus-wide questions with community
+evidence and include a representative labelled corpus before promoting the
+framework release.
 
 
 ### Verification baseline
@@ -74,3 +71,20 @@ dimensions), Qwen 2.5 1.5B, and ClickHouse 26.3.62.3. The example returned
 question to mention the intermediate service explicitly caused that model to
 produce an invalid plan and abstain. Treat the example as an end-to-end
 integration check. The planner still needs paraphrase and ambiguity evaluation.
+
+### Document publication
+
+The document facade uses a managed passage table. It stages immutable passages
+and their extracted facts in the same MergeTree table, then inserts a small
+publication record. A query selects the highest published document revision
+before applying metadata filters. A deletion publishes a revision without
+passages. This also hides assertions on removed chunks and metadata changed
+by a replacement. The low-level passage and relation stores retain their
+original layouts and operations.
+
+A single ClickHouse statement shares its part snapshot across all references to
+the managed table. In the facade, multi-hop and mixed retrieval also recheck
+assembled evidence against the published revisions. An update during retrieval
+may result in fewer returned passages or paths. Visibility is defined for
+queries on the same ClickHouse server. Physical retention of superseded data
+is a separate operation.

@@ -6,15 +6,76 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from clickhouserag._documents import DocumentStore, _Fact
 from clickhouserag._lexical import terms
 from clickhouserag._validation import _MAX_BATCH, identifier, integer, nonblank
 from clickhouserag.models import Chunk, SchemaError
 from clickhouserag.store import _SELECT_SETTINGS, ClickHouseStore, _scope
 
 _GRAPH_SCHEMA = "clickhouserag:graph:4"
+_EDGE_TABLE = "{database:Identifier}.{table:Identifier} FINAL"
+_DOCUMENT_EDGES = """
+    (SELECT namespace, chunk_id, revision, entity_terms,
+        fact.1 AS subject, fact.2 AS predicate, fact.3 AS object,
+        fact.4 AS subject_type, fact.5 AS object_type,
+        fact.6 AS subject_terms, fact.7 AS object_terms
+    FROM @support@
+    ARRAY JOIN facts AS fact)
+"""
 _MAX_DEPTH = 4
 _MAX_FRONTIER = 128
 _MAX_FANOUT = 64
+_SEED_SQL = """
+WITH matches AS (
+    SELECT subject, object, subject_terms, object_terms, chunk_id, revision
+    FROM @edges@
+    WHERE namespace = {namespace:String}
+        AND hasAnyTokens(entity_terms, {terms:Array(String)})
+), supporting AS (
+    SELECT chunk_id, revision
+    FROM @support@
+    WHERE namespace = {namespace:String}
+        AND chunk_id IN (SELECT chunk_id FROM matches)
+        AND arrayAll(pair -> mapContains(metadata, pair.1)
+            AND metadata[pair.1] = pair.2, {filters:Array(Tuple(String, String))})
+), labels AS (
+    SELECT DISTINCT arrayJoin([(m.subject, m.subject_terms),
+                               (m.object, m.object_terms)]) AS item
+    FROM matches AS m
+    INNER JOIN supporting AS p ON m.chunk_id = p.chunk_id AND m.revision = p.revision
+)
+SELECT item.1 AS label
+FROM labels
+WHERE length(arrayIntersect(item.2, {terms:Array(String)})) > 0
+ORDER BY length(arrayIntersect(item.2, {terms:Array(String)})) DESC,
+    length(item.2) ASC, label ASC
+LIMIT {limit:UInt32}
+"""
+
+_NEIGHBORS_SQL = """
+WITH edges AS (
+    SELECT subject, predicate, object, chunk_id, revision, subject_type, object_type
+    FROM @edges@
+    WHERE namespace = {namespace:String}
+        AND subject IN {subjects:Array(String)}
+        AND ({predicate:String} = '' OR predicate = {predicate:String})
+        AND ({subject_type:String} = '' OR subject_type = {subject_type:String})
+        AND ({object_type:String} = '' OR object_type = {object_type:String})
+), supporting AS (
+    SELECT chunk_id, document_id, text, source, revision, metadata
+    FROM @support@
+    WHERE namespace = {namespace:String}
+        AND chunk_id IN (SELECT chunk_id FROM edges)
+        AND arrayAll(pair -> mapContains(metadata, pair.1)
+            AND metadata[pair.1] = pair.2, {filters:Array(Tuple(String, String))})
+)
+SELECT e.subject, e.predicate, e.object, e.chunk_id, e.revision,
+    p.document_id, p.text, p.source, p.metadata, e.subject_type, e.object_type
+FROM edges AS e
+INNER JOIN supporting AS p ON e.chunk_id = p.chunk_id AND e.revision = p.revision
+ORDER BY e.subject, e.predicate, e.object, e.chunk_id, e.subject_type, e.object_type
+LIMIT {fanout:UInt32} BY e.subject
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,18 +117,28 @@ class GraphStore:
 
     def __init__(self, passages: ClickHouseStore, *, table: str | None = None) -> None:
         self._passages = passages
+        self._managed = isinstance(passages, DocumentStore)
+        if self._managed and table is not None:
+            raise ValueError("a managed collection stores facts with its passages")
         self._client = passages._client
         database = passages._location["database"]
         passage_table = passages._location["table"]
         if table is None:
-            table = f"{passage_table}_relations"
+            table = passage_table if self._managed else f"{passage_table}_relations"
         self._qualified_table = f"{identifier(database)}.{identifier(table)}"
         self._location = {"database": database, "table": table, "passage_table": passage_table}
         self._manifest = f"{_GRAPH_SCHEMA}:{passage_table}"
+        self._support_query = passages._passage_source.replace(
+            "{table:Identifier}", "{passage_table:Identifier}"
+        )
+        self._edges_query = _DOCUMENT_EDGES if self._managed else _EDGE_TABLE
         self._validated = False
 
     def initialize(self) -> None:
         """Provision the companion table after the passage table has been created."""
+        if self._managed:
+            self.validate_schema()
+            return
         self._passages.validate_schema()
         self._client.command(
             f"""
@@ -98,6 +169,9 @@ class GraphStore:
         """Verify the companion table belongs to the configured passage table."""
         self._validated = False
         self._passages.validate_schema()
+        if self._managed:
+            self._validated = True
+            return
         result = self._client.query(
             """
             SELECT comment FROM system.tables
@@ -111,6 +185,8 @@ class GraphStore:
 
     def insert(self, relations: Iterable[Relation], *, namespace: str = "default") -> int:
         """Validate and append a batch of up to 10,000 cited relationships."""
+        if self._managed:
+            raise ValueError("index a Document through RAG to write this managed collection")
         nonblank(namespace, "namespace")
         rows = {}
         for count, relation in enumerate(relations, start=1):
@@ -209,32 +285,9 @@ class GraphStore:
             return []
         self._ensure_schema()
         result = self._client.query(
-            """
-            WITH matches AS (
-                SELECT subject, object, subject_terms, object_terms, chunk_id, revision
-                FROM {database:Identifier}.{table:Identifier} FINAL
-                WHERE namespace = {namespace:String}
-                    AND hasAnyTokens(entity_terms, {terms:Array(String)})
-            ), supporting AS (
-                SELECT chunk_id, revision
-                FROM {database:Identifier}.{passage_table:Identifier} FINAL
-                WHERE namespace = {namespace:String}
-                    AND chunk_id IN (SELECT chunk_id FROM matches)
-                    AND arrayAll(pair -> mapContains(metadata, pair.1)
-                        AND metadata[pair.1] = pair.2, {filters:Array(Tuple(String, String))})
-            ), labels AS (
-                SELECT DISTINCT arrayJoin([(m.subject, m.subject_terms),
-                                           (m.object, m.object_terms)]) AS item
-                FROM matches AS m
-                INNER JOIN supporting AS p ON m.chunk_id = p.chunk_id AND m.revision = p.revision
-            )
-            SELECT item.1 AS label
-            FROM labels
-            WHERE length(arrayIntersect(item.2, {terms:Array(String)})) > 0
-            ORDER BY length(arrayIntersect(item.2, {terms:Array(String)})) DESC,
-                length(item.2) ASC, label ASC
-            LIMIT {limit:UInt32}
-            """,
+            _SEED_SQL.replace("@edges@", self._edges_query).replace(
+                "@support@", self._support_query
+            ),
             parameters={**params, **self._location, "terms": query_terms},
             settings=_SELECT_SETTINGS,
         )
@@ -249,30 +302,9 @@ class GraphStore:
     ) -> defaultdict[str, list[GraphStep]]:
         self._ensure_schema()
         result = self._client.query(
-            """
-            WITH edges AS (
-                SELECT subject, predicate, object, chunk_id, revision, subject_type, object_type
-                FROM {database:Identifier}.{table:Identifier} FINAL
-                WHERE namespace = {namespace:String}
-                    AND subject IN {subjects:Array(String)}
-                    AND ({predicate:String} = '' OR predicate = {predicate:String})
-                    AND ({subject_type:String} = '' OR subject_type = {subject_type:String})
-                    AND ({object_type:String} = '' OR object_type = {object_type:String})
-            ), supporting AS (
-                SELECT chunk_id, document_id, text, source, revision, metadata
-                FROM {database:Identifier}.{passage_table:Identifier} FINAL
-                WHERE namespace = {namespace:String}
-                    AND chunk_id IN (SELECT chunk_id FROM edges)
-                    AND arrayAll(pair -> mapContains(metadata, pair.1)
-                        AND metadata[pair.1] = pair.2, {filters:Array(Tuple(String, String))})
-            )
-            SELECT e.subject, e.predicate, e.object, e.chunk_id, e.revision,
-                p.document_id, p.text, p.source, p.metadata, e.subject_type, e.object_type
-            FROM edges AS e
-            INNER JOIN supporting AS p ON e.chunk_id = p.chunk_id AND e.revision = p.revision
-            ORDER BY e.subject, e.predicate, e.object, e.chunk_id, e.subject_type, e.object_type
-            LIMIT {fanout:UInt32} BY e.subject
-            """,
+            _NEIGHBORS_SQL.replace("@edges@", self._edges_query).replace(
+                "@support@", self._support_query
+            ),
             parameters={
                 **scope,
                 **self._location,
@@ -353,3 +385,8 @@ def _relation_row(
         canonical_entity(relation.subject_type) if relation.subject_type is not None else "",
         canonical_entity(relation.object_type) if relation.object_type is not None else "",
     )
+
+
+def _document_fact(relation: Relation) -> _Fact:
+    _, subject, predicate, obj, _, _, subject_type, object_type = _relation_row("", relation)
+    return subject, predicate, obj, subject_type, object_type, terms(subject), terms(obj)

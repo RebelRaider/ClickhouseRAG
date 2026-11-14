@@ -1,8 +1,7 @@
 # Framework quickstart
 
-The framework API uses one ClickHouse HTTP client. It creates a passage table
-and, when configured for graph retrieval or reasoning, an adjacent relationship
-table. The same collection and metadata filters apply to text search, graph
+The framework API uses one ClickHouse HTTP client and provisions one managed
+table for document revisions, passages, and their relationships. The same collection and metadata filters apply to text search, graph
 expansion, and reasoning.
 
 Start a compatible ClickHouse server as in the [quickstart](quickstart.md).
@@ -32,12 +31,11 @@ and evidence IDs or an explicit abstention. Unknown citations are rejected.
 Citation validation checks that the references were supplied to the generator.
 It does not judge whether the generated claim entails the evidence.
 
-- `index(Document(...))` chunks a text snapshot by character count and overlap,
-  batches its embeddings, and stores its passages and optional assertions.
-  Identical input with deterministic providers can be retried. Changed input
-  creates a new snapshot alongside the previous one. Use a new namespace
-  for an exclusively current corpus; the current facade has no document
-  replacement or deletion API.
+- `index(Document(...))` chunks a document by character count and overlap,
+  batches the embeddings, and publishes the new passages and assertions
+  together. Reusing the same document ID with changed input supersedes the
+  entire previous revision. Repeating the current payload returns zero and
+  skips the models. `delete(document_id)` hides the document and its facts.
 - `retrieve(question)` defaults to mixed search. It selects matching entity
   labels and follows directed relationships, then fills the remaining
   context budget with hybrid text search. Use `seeds` for explicit entity IDs. Open a collection for reading with
@@ -54,6 +52,28 @@ It does not judge whether the generated claim entails the evidence.
   with an explicit plan when the application already knows the chain.
   Corpus-wide community summaries are described in the
   [framework design](maintainer/framework.md).
+
+## Updates and deployment
+
+Treat document IDs as stable within a namespace. For multiple writers or
+replayed events, pass a monotonically increasing source revision as
+`Document(..., revision=n)` or `delete(id, revision=n)`. An older explicit
+revision raises `DocumentRevisionError`. Repeating the latest revision and
+payload is a no-op and a conflicting payload at the same visible revision
+raises an error. If two different payloads race before either head is published,
+ClickHouse deterministically chooses one generation at that revision. A
+same-revision deletion wins over a live generation. Supply unique increasing
+source revisions for intentional ordering across concurrent writers.
+
+Publication follows successful staging. A failed operation can leave hidden
+parts that consume storage. Logical deletion keeps stored history; manage
+physical retention separately. On a single ClickHouse server, a fresh read
+can see the whole old or whole new document. Queries that span several
+statements recheck candidate evidence, which can reduce recall if a revision
+changes during retrieval. Replica-wide visibility depends on deployment and
+read routing. Provision a new table for the managed API when coming from the
+low-level passage schema or the framework prototype, then re-index source
+documents. The low-level `ClickHouseStore` still reads its own tables.
 
 ## Evaluate against your corpus
 
